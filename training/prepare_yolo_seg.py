@@ -11,6 +11,7 @@ from common_training import (
     category_mapping,
     copy_image,
     file_sha256,
+    layers_for,
     load_json,
     normalize_polygon,
     read_csv,
@@ -136,6 +137,20 @@ def prepare_yolo(coco_path, output_dir):
         exported_images += 1
         exported_labels += len(label_lines)
         skipped_labels = skipped_by_image.get(image.get("id"), 0)
+
+        # Classify the image on both layer axes. An explicit `dataset_layer`
+        # recorded anywhere (corpus row, COCO image, COCO metadata) is the
+        # curator's decision and wins over the text heuristics.
+        layer_row = dict(image.get("metadata") or {})
+        layer_row.update({key: value for key, value in image.items() if key != "metadata"})
+        layer_row.update({key: value for key, value in (corpus_row or {}).items() if value})
+        layer_info = layers_for(layer_row)
+        declared = str(layer_row.get("dataset_layer", "") or "").strip()
+        if declared:
+            # Preserve the recorded value verbatim (e.g. `real_near_emps`),
+            # which downstream audits match on.
+            layer_info["dataset_layer"] = declared
+
         nm_per_px = corpus_row.get("nm_per_px") or image.get("nm_per_px") or image.get("metadata", {}).get("nm_per_px", "")
         license_text = corpus_row.get("license") or image.get("license") or image.get("metadata", {}).get("license", "")
         license_status = corpus_row.get("license_status") or image.get("license_status") or image.get("metadata", {}).get("license_status", "")
@@ -153,7 +168,9 @@ def prepare_yolo(coco_path, output_dir):
                 "image_id": image.get("id"),
                 "source_id": group,
                 "split": split,
-                "dataset_layer": corpus_row.get("dataset_layer") or image.get("dataset_layer") or image.get("metadata", {}).get("dataset_layer", ""),
+                "dataset_layer": layer_info["dataset_layer"],
+                "content_layer": layer_info["content_layer"],
+                "distribution_layer": layer_info["distribution_layer"],
                 "image_path": str(image_target),
                 "label_path": str(label_target),
                 "file_sha256": file_sha256(image_target),

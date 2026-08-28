@@ -6,6 +6,72 @@ from pathlib import Path
 from common_training import CLASS_NAMES, DEFAULT_YOLO_DIR, TRAINING_AUDIT_MD
 
 
+#: Dataset milestones from training/README.md, expressed as checks rather than
+#: prose. `min_images` gates the milestone; `min_sources` and `min_real_exact`
+#: capture the "3-5 sources" and "real Au@SiO2 truth" requirements that image
+#: count alone cannot express.
+DATASET_TARGETS = {
+    "smoke": {
+        "min_images": 5, "max_images": 10, "min_sources": 1, "min_real_exact": 0,
+        "description": "Smoke dataset: end-to-end pipeline check.",
+    },
+    "pilot": {
+        "min_images": 150, "max_images": 250, "min_sources": 2, "min_real_exact": 1,
+        "description": "Pilot: first dataset large enough to train on.",
+    },
+    "v0": {
+        "min_images": 300, "max_images": 600, "min_sources": 3, "min_real_exact": 1,
+        "description": "Useful v0: a model worth evaluating.",
+    },
+    "publication": {
+        "min_images": 600, "max_images": 1200, "min_sources": 3, "min_real_exact": 1,
+        "description": "Publication target: 3-5 sources, multiple magnifications "
+                       "and shell-thickness ranges.",
+    },
+}
+
+#: Order from smallest to largest, for reporting which milestone is reached.
+TARGET_ORDER = ("smoke", "pilot", "v0", "publication")
+
+
+def evaluate_target(name, total_images, sources, real_exact_images):
+    """Check a dataset against one documented milestone."""
+    target = DATASET_TARGETS[name]
+    checks = {
+        "images": {
+            "value": total_images,
+            "minimum": target["min_images"],
+            "pass": total_images >= target["min_images"],
+        },
+        "sources": {
+            "value": sources,
+            "minimum": target["min_sources"],
+            "pass": sources >= target["min_sources"],
+        },
+        "real_exact_images": {
+            "value": real_exact_images,
+            "minimum": target["min_real_exact"],
+            "pass": real_exact_images >= target["min_real_exact"],
+        },
+    }
+    return {
+        "target": name,
+        "description": target["description"],
+        "range": [target["min_images"], target["max_images"]],
+        "checks": checks,
+        "pass": all(check["pass"] for check in checks.values()),
+    }
+
+
+def reached_target(total_images, sources, real_exact_images):
+    """The largest milestone the dataset currently satisfies, or None."""
+    reached = None
+    for name in TARGET_ORDER:
+        if evaluate_target(name, total_images, sources, real_exact_images)["pass"]:
+            reached = name
+    return reached
+
+
 def write_report(path, result):
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -17,8 +83,25 @@ def write_report(path, result):
         f"- Label rows: {result['label_rows']}",
         f"- Class counts: {result['class_counts']}",
         f"- Dataset layers: {result['dataset_layers']}",
+        f"- Content layers: {result.get('content_layers', {})}",
+        f"- Source groups: {result.get('source_groups', 0)}",
         f"- Manifest rows: {result.get('manifest_rows', 0)}",
         f"- Provenance gaps: {result.get('provenance', {})}",
+        f"- Milestone reached: {result.get('reached_target') or 'none'}",
+        "",
+        "## Dataset target",
+    ]
+    target = result.get("target")
+    if not target:
+        lines.append("- No target requested (pass --target smoke|pilot|v0|publication).")
+    else:
+        lines.append(f"- Target `{target['target']}`: {'PASS' if target['pass'] else 'FAIL'} "
+                     f"— {target['description']}")
+        lines.append(f"- Image range for this milestone: {target['range'][0]}–{target['range'][1]}")
+        for name, check in target["checks"].items():
+            lines.append(f"  - {name}: {check['value']} (min {check['minimum']}) "
+                         f"{'OK' if check['pass'] else 'SHORT'}")
+    lines.extend([
         "",
         "## Errors",
     ]
@@ -51,12 +134,15 @@ def class_names_from_data_yaml(data_yaml):
     return [names[index] for index in sorted(names)]
 
 
-def audit_dataset(dataset_dir, min_images=0, min_au_core=0, min_sio2_outer=0, require_test=False):
+def audit_dataset(dataset_dir, min_images=0, min_au_core=0, min_sio2_outer=0, require_test=False,
+                  target=None):
     dataset_dir = Path(dataset_dir)
     errors = []
     warnings = []
     counts = {"train": 0, "val": 0, "test": 0}
     dataset_layers = {}
+    content_layers = {}
+    source_groups = set()
     label_rows = 0
 
     data_yaml = dataset_dir / "data.yaml"
@@ -81,6 +167,10 @@ def audit_dataset(dataset_dir, min_images=0, min_au_core=0, min_sio2_outer=0, re
                 groups_by_split.setdefault(group, set()).add(row.get("split", ""))
                 layer = row.get("dataset_layer", "") or "unspecified"
                 dataset_layers[layer] = dataset_layers.get(layer, 0) + 1
+                content = row.get("content_layer", "") or "unspecified"
+                content_layers[content] = content_layers.get(content, 0) + 1
+                if group:
+                    source_groups.add(group)
 
                 if not row.get("nm_per_px") and layer not in {"real_near_emps"}:
                     provenance["missing_calibration"] += 1
@@ -165,14 +255,39 @@ def audit_dataset(dataset_dir, min_images=0, min_au_core=0, min_sio2_outer=0, re
             f"Manifest lists {manifest_rows} images but {sum(counts.values())} are present on disk."
         )
 
+    total_images = sum(counts.values())
+    real_exact_images = content_layers.get("real_exact", 0)
+    target_result = None
+    if target:
+        target_result = evaluate_target(target, total_images, len(source_groups), real_exact_images)
+        if not target_result["pass"]:
+            for name, check in target_result["checks"].items():
+                if not check["pass"]:
+                    errors.append(
+                        f"Target '{target}' not met: {name} is {check['value']}, "
+                        f"needs at least {check['minimum']}."
+                    )
+
+    # Au@SiO2 core/shell metrology may only be reported from `real_exact` data.
+    # A dataset with none is still trainable, but it is transfer material.
+    if manifest_rows and real_exact_images == 0:
+        warnings.append(
+            "No `real_exact` images: this dataset carries no real Au@SiO2 core-shell truth "
+            "and must not be used to report core/shell metrology."
+        )
+
     return {
         "ok": not errors,
         "counts": counts,
         "label_rows": label_rows,
         "class_counts": class_counts,
         "dataset_layers": dataset_layers,
+        "content_layers": content_layers,
+        "source_groups": len(source_groups),
         "manifest_rows": manifest_rows,
         "provenance": provenance,
+        "target": target_result,
+        "reached_target": reached_target(total_images, len(source_groups), real_exact_images),
         "errors": errors,
         "warnings": warnings,
     }
@@ -185,6 +300,12 @@ def main():
     parser.add_argument("--min-au-core", type=int, default=0)
     parser.add_argument("--min-sio2-outer", type=int, default=0)
     parser.add_argument("--require-test", action="store_true")
+    parser.add_argument(
+        "--target",
+        choices=list(TARGET_ORDER),
+        default=None,
+        help="Fail the audit unless the dataset meets this documented milestone.",
+    )
     parser.add_argument("--report", default=str(TRAINING_AUDIT_MD))
     args = parser.parse_args()
     result = audit_dataset(
@@ -193,6 +314,7 @@ def main():
         min_au_core=args.min_au_core,
         min_sio2_outer=args.min_sio2_outer,
         require_test=args.require_test,
+        target=args.target,
     )
     write_report(args.report, result)
     print(result)

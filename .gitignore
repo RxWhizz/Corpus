@@ -2,6 +2,7 @@
 node_modules/
 dist/
 squashfs-root/
+.venv/
 
 # Generated datasets and experiment outputs
 data/

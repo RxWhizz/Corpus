@@ -95,7 +95,109 @@ def has_confirmed_scale(row):
     return bool(nm_per_px) and status in {"confirmed", "manual_line", "manual", "metadata"}
 
 
+#: The dataset layers documented in training/README.md. They are two
+#: independent axes that the flat list in the docs hides:
+#:
+#:   content      what the image *is*      real_exact | real_near | synthetic_core_shell
+#:   distribution what may be *shared*     public_demo | private_training
+#:
+#: A publicly licensed Au@SiO2 micrograph is both `real_exact` and
+#: `public_demo`; collapsing that to one label loses whichever half you did not
+#: pick. `training_layer` keeps the historical single-label view for callers
+#: that need one string; `content_layer` and `distribution_layer` give the axes.
+CONTENT_LAYERS = ("real_exact", "real_near", "synthetic_core_shell", "unknown")
+DISTRIBUTION_LAYERS = ("public_demo", "private_training")
+DATASET_LAYERS = ("real_exact", "real_near", "synthetic_core_shell", "public_demo", "private_training")
+
+#: Text that identifies a genuine Au@SiO2 core-shell subject -- the only
+#: material Corpus reports core/shell metrology for.
+CORE_SHELL_HINTS = (
+    "au@sio2", "au@sio\u2082", "au-sio2", "au/sio2", "au sio2",
+    "core-shell", "core shell", "coreshell",
+    "gold core", "au core", "silica shell", "sio2 shell",
+)
+
+#: Text that identifies a related electron-microscopy particle dataset:
+#: useful for transfer/pretraining, never for core-shell truth.
+NEAR_HINTS = (
+    "nanoparticle", "nanoparticles", "nanorod", "nanosphere", "colloid",
+    "tem", "stem", "haadf", "bf-tem", "sem", "micrograph",
+    "electron microscopy", "electron micrograph", "emps",
+)
+
+SYNTHETIC_HINTS = ("synthetic", "phantom", "simulated")
+
+
+def _layer_text(row, source_row):
+    """Free-text signals used to classify an image's content layer."""
+    row = row or {}
+    source_row = source_row or {}
+    parts = [
+        row.get(key, "") for key in
+        ("notes", "caption", "modality", "figure_label", "source_type", "title")
+    ] + [
+        source_row.get(key, "") for key in
+        ("title", "abstract", "keywords", "modality", "source_type", "journal")
+    ]
+    return " ".join(str(part) for part in parts).lower()
+
+
+def declared_layer(row, source_row=None):
+    """The curator's explicit `dataset_layer`, if one was recorded.
+
+    An explicit decision always wins over text heuristics.
+    """
+    row = row or {}
+    source_row = source_row or {}
+    declared = str(row.get("dataset_layer", "") or source_row.get("dataset_layer", "")).strip().lower()
+    return declared or ""
+
+
+def content_layer(row, source_row=None):
+    """What the image is: `real_exact`, `real_near`, `synthetic_core_shell`, `unknown`.
+
+    `real_exact` is real Au@SiO2 core-shell data -- the only layer that may be
+    used to report core/shell metrology. `real_near` is related EM particle
+    data for transfer/pretraining only. Variants such as `real_near_emps`
+    collapse to `real_near`.
+    """
+    declared = declared_layer(row, source_row)
+    if declared:
+        if declared in CONTENT_LAYERS:
+            return declared
+        # `real_near_emps` and friends belong to the real_near family.
+        if declared.startswith("real_near"):
+            return "real_near"
+        if declared.startswith("real_exact"):
+            return "real_exact"
+        if any(hint in declared for hint in SYNTHETIC_HINTS):
+            return "synthetic_core_shell"
+
+    text = _layer_text(row, source_row)
+    if any(hint in text for hint in SYNTHETIC_HINTS):
+        return "synthetic_core_shell"
+    if any(hint in text for hint in CORE_SHELL_HINTS):
+        return "real_exact"
+    if any(hint in text for hint in NEAR_HINTS):
+        return "real_near"
+    return "unknown"
+
+
+def distribution_layer(row, source_row=None):
+    """What may be shared: `public_demo` when redistributable, else `private_training`."""
+    return "public_demo" if is_public_license(row) or is_public_license(source_row or {}) else "private_training"
+
+
 def training_layer(row, source_row=None):
+    """Historical single-label view, kept for callers that need one string.
+
+    Distribution wins over content here, because the question this answers is
+    "which bucket does this image belong to for export?". Its result is
+    deliberately limited to the distribution buckets plus `synthetic_core_shell`,
+    unchanged from before the content axis existed, so export filtering keeps
+    behaving the same. Use :func:`content_layer` when you need to know whether
+    an image is Au@SiO2 truth regardless of its licence.
+    """
     source_row = source_row or {}
     if is_public_license(source_row) or is_public_license(row):
         return "public_demo"
@@ -104,6 +206,15 @@ def training_layer(row, source_row=None):
     if "synthetic" in source_type or "synthetic" in notes:
         return "synthetic_core_shell"
     return "private_training"
+
+
+def layers_for(row, source_row=None):
+    """Both axes plus the single-label view, for manifests and reports."""
+    return {
+        "dataset_layer": training_layer(row, source_row),
+        "content_layer": content_layer(row, source_row),
+        "distribution_layer": distribution_layer(row, source_row),
+    }
 
 
 def annotation_review_status(annotation):
@@ -193,6 +304,8 @@ MANIFEST_FIELDS = [
     "source_id",
     "split",
     "dataset_layer",
+    "content_layer",
+    "distribution_layer",
     "image_path",
     "label_path",
     "file_sha256",

@@ -24,16 +24,9 @@ calibration, a settings record, and a human decision.**
 Corpus does not replace expert review. It makes review fast, and it makes the
 result reproducible.
 
-<!-- SCREENSHOTS: replace the placeholders below with real captures.
-     See docs/screenshots.md for the exact shots to take. -->
-
 | Measurement workspace | Review basket | Distribution summary |
 |---|---|---|
-| _screenshot pending_ | _screenshot pending_ | _screenshot pending_ |
-
-> **Screenshots are still to be captured.** Corpus needs a display to run, so
-> the images cannot be generated in CI. `docs/screenshots.md` lists exactly
-> which three shots to take and where to drop them.
+| ![Measurement workspace](docs/images/measurement-workspace.png) | ![Review basket](docs/images/review-basket.png) | ![Distribution summary](docs/images/distribution-summary.png) |
 
 ---
 

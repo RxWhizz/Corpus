@@ -6,12 +6,13 @@ from pathlib import Path
 from common_training import (
     CLASS_NAMES,
     DATA_DIR,
+    DATASET_LAYERS,
     DEFAULT_CVAT_DIR,
     has_confirmed_scale,
     is_public_license,
+    layers_for,
     read_csv,
     resolve_image_path,
-    training_layer,
 )
 
 
@@ -19,14 +20,27 @@ def source_index():
     return {row.get("source_id", ""): row for row in read_csv(DATA_DIR / "sources.csv")}
 
 
+def matches_layer(layer, info):
+    """Match a requested layer against either axis.
+
+    `--layer public_demo` and `--layer private_training` select on
+    distribution; `--layer real_exact` and `--layer real_near` select on
+    content; `synthetic_core_shell` is accepted on either, since it appears on
+    both axes in the documented layer list.
+    """
+    if layer == "all":
+        return True
+    return layer in (info["dataset_layer"], info["content_layer"], info["distribution_layer"])
+
+
 def should_export(row, source_row, layer, require_scale):
     if row.get("curation_status") != "accepted":
         return False, "curation_status_not_accepted"
     if require_scale and not has_confirmed_scale(row):
         return False, "missing_confirmed_scale"
-    row_layer = training_layer(row, source_row)
-    if layer != "all" and row_layer != layer:
-        return False, f"layer_is_{row_layer}"
+    info = layers_for(row, source_row)
+    if not matches_layer(layer, info):
+        return False, f"layer_is_{info['dataset_layer']}/{info['content_layer']}"
     if layer == "public_demo" and not (is_public_license(row) or is_public_license(source_row)):
         return False, "license_not_public"
     return True, ""
@@ -55,11 +69,11 @@ def export_package(output_dir, layer="all", require_scale=True):
                 continue
             target = images_dir / source.name
             shutil.copy2(source, target)
-            row_layer = training_layer(row, source_row)
+            info = layers_for(row, source_row)
             rows.append(
                 {
                     **row,
-                    "dataset_layer": row_layer,
+                    **info,
                     "cvat_file": str(target),
                     "doi": source_row.get("doi", ""),
                     "license_status": source_row.get("license_status", row.get("license_status", "")),
@@ -72,6 +86,10 @@ def export_package(output_dir, layer="all", require_scale=True):
             writer.writeheader()
             writer.writerows(rows)
     (output_dir / "labels.txt").write_text("\n".join(CLASS_NAMES) + "\n", encoding="utf-8")
+    layer_counts = {}
+    for row in rows:
+        key = f"{row['content_layer']} / {row['distribution_layer']}"
+        layer_counts[key] = layer_counts.get(key, 0) + 1
     (output_dir / "annotation_policy.md").write_text(
         "# Corpus Au@SiO2 Core-Shell Annotation Policy\n\n"
         "- `Au_core`: closed polygon around the visible dark Au core.\n"
@@ -80,13 +98,26 @@ def export_package(output_dir, layer="all", require_scale=True):
         "- Mark uncertain objects as `needs_review` in CVAT attributes if they must be preserved in the master COCO; they will be excluded from YOLO export.\n",
         encoding="utf-8",
     )
-    return {"output": str(output_dir), "images": len(rows), "layer": layer, "skipped": skipped}
+    return {
+        "output": str(output_dir),
+        "images": len(rows),
+        "layer": layer,
+        "layer_counts": layer_counts,
+        "skipped": skipped,
+    }
 
 
 def main():
     parser = argparse.ArgumentParser(description="Export accepted Corpus images for CVAT annotation.")
     parser.add_argument("--out", default=str(DEFAULT_CVAT_DIR))
-    parser.add_argument("--layer", choices=["all", "public_demo", "private_training", "synthetic_core_shell"], default="all")
+    parser.add_argument(
+        "--layer",
+        choices=["all", *DATASET_LAYERS],
+        default="all",
+        help="Dataset layer to export. Distribution layers (public_demo, "
+             "private_training) and content layers (real_exact, real_near, "
+             "synthetic_core_shell) are both accepted.",
+    )
     parser.add_argument("--allow-estimated-scale", action="store_true")
     args = parser.parse_args()
     print(export_package(args.out, layer=args.layer, require_scale=not args.allow_estimated_scale))
