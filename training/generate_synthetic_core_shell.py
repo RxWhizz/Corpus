@@ -1,11 +1,9 @@
 import argparse
-import json
 import math
 from pathlib import Path
 
 import cv2
 import numpy as np
-
 from common_training import COCO_CATEGORIES, SYNTHETIC_DIR, write_json
 
 
@@ -28,6 +26,19 @@ def draw_core_shell(image, core_mask, outer_mask, rng, nm_per_px, overlap):
     shell_nm = rng.uniform(2, 18)
     core_r = max(3, int((core_d_nm / 2) / nm_per_px))
     outer_r = max(core_r + 2, int(((core_d_nm / 2) + shell_nm) / nm_per_px))
+
+    # A small canvas combined with a fine nm/px can make the particle larger
+    # than the frame. Clamp instead of raising an opaque "low >= high" from the
+    # placement draw below. The clamp happens after the RNG draws, so existing
+    # datasets regenerate identically.
+    max_radius = min(height, width) // 2 - 5
+    if max_radius < 5:
+        raise ValueError(
+            f"Image {width}x{height} is too small to place a particle; use at least 20x20."
+        )
+    if outer_r > max_radius:
+        outer_r = max_radius
+        core_r = max(3, min(core_r, outer_r - 2))
 
     for _ in range(100):
         cx = int(rng.integers(outer_r + 3, width - outer_r - 3))

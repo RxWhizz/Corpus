@@ -1,0 +1,116 @@
+{
+  "config": [
+    "--shape-preset",
+    "generic",
+    "--mode",
+    "au",
+    "--watershed",
+    "true",
+    "--au-min-radius",
+    "10",
+    "--au-max-radius",
+    "40"
+  ],
+  "decorated_particle_metrics": null,
+  "ground_truth_comparison": {
+    "detected_mean_diameter_nm": 40.333333,
+    "detected_objects": 3,
+    "mean_diameter_ratio": 0.930769,
+    "true_mean_diameter_nm": 43.333333,
+    "true_particles": 3
+  },
+  "image_id": "demo_003_touching_spheres",
+  "manual_scale_px": 100.0,
+  "nm_per_px": 0.5,
+  "object_summary": {
+    "mean_inner_major_axis": 40.333333,
+    "mean_outer_major_axis": 0,
+    "mean_shell_thickness": 0,
+    "needs_review": 3,
+    "objects": 3,
+    "paired": 0,
+    "ready": 0,
+    "watershed_splits": 3
+  },
+  "objects": [
+    {
+      "backend": "classical",
+      "center_x": 168.0,
+      "center_y": 200.0,
+      "confidence_score": 0.7,
+      "equivalent_diameter": 42.861702,
+      "flags": [
+        "unpaired_outer",
+        "watershed_split"
+      ],
+      "inner_major_axis": 43.0,
+      "inner_minor_axis": 41.0,
+      "inner_outer_ratio": 0,
+      "object_id": "obj_0001",
+      "outer_major_axis": 0,
+      "outer_minor_axis": 0,
+      "pair_status": "partial",
+      "preset": "generic",
+      "review_status": "needs_review",
+      "separation_method": "watershed",
+      "shell_thickness_estimate": 0
+    },
+    {
+      "backend": "classical",
+      "center_x": 252.0,
+      "center_y": 200.0,
+      "confidence_score": 0.7,
+      "equivalent_diameter": 42.830128,
+      "flags": [
+        "unpaired_outer",
+        "watershed_split"
+      ],
+      "inner_major_axis": 43.0,
+      "inner_minor_axis": 41.0,
+      "inner_outer_ratio": 0,
+      "object_id": "obj_0002",
+      "outer_major_axis": 0,
+      "outer_minor_axis": 0,
+      "pair_status": "partial",
+      "preset": "generic",
+      "review_status": "needs_review",
+      "separation_method": "watershed",
+      "shell_thickness_estimate": 0
+    },
+    {
+      "backend": "classical",
+      "center_x": 340.0,
+      "center_y": 330.0,
+      "confidence_score": 0.7,
+      "equivalent_diameter": 35.129581,
+      "flags": [
+        "unpaired_outer",
+        "watershed_split"
+      ],
+      "inner_major_axis": 35.0,
+      "inner_minor_axis": 35.0,
+      "inner_outer_ratio": 0,
+      "object_id": "obj_0003",
+      "outer_major_axis": 0,
+      "outer_minor_axis": 0,
+      "pair_status": "partial",
+      "preset": "generic",
+      "review_status": "needs_review",
+      "separation_method": "watershed",
+      "shell_thickness_estimate": 0
+    }
+  ],
+  "scale_method": "manual_override",
+  "scale_nm": 50.0,
+  "summary": {
+    "Au_decorations": {
+      "count": 3,
+      "max_diameter": 43.0,
+      "mean_diameter": 40.333333,
+      "min_diameter": 35.0
+    }
+  },
+  "warnings": [
+    "Many unpaired objects"
+  ]
+}

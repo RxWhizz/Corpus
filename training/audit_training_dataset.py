@@ -3,7 +3,7 @@ import csv
 import re
 from pathlib import Path
 
-from common_training import DEFAULT_YOLO_DIR, CLASS_NAMES, TRAINING_AUDIT_MD
+from common_training import CLASS_NAMES, DEFAULT_YOLO_DIR, TRAINING_AUDIT_MD
 
 
 def write_report(path, result):
@@ -17,6 +17,8 @@ def write_report(path, result):
         f"- Label rows: {result['label_rows']}",
         f"- Class counts: {result['class_counts']}",
         f"- Dataset layers: {result['dataset_layers']}",
+        f"- Manifest rows: {result.get('manifest_rows', 0)}",
+        f"- Provenance gaps: {result.get('provenance', {})}",
         "",
         "## Errors",
     ]
@@ -61,21 +63,46 @@ def audit_dataset(dataset_dir, min_images=0, min_au_core=0, min_sio2_outer=0, re
     if not data_yaml.exists():
         errors.append("Missing data.yaml.")
     class_names = class_names_from_data_yaml(data_yaml)
-    class_counts = {name: 0 for name in class_names}
+    class_counts = dict.fromkeys(class_names, 0)
 
     groups_by_split = {}
+    manifest_rows = 0
+    provenance = {"missing_license": 0, "missing_source": 0, "missing_checksum": 0,
+                  "missing_calibration": 0, "partial_annotation_review": 0}
     manifest_path = dataset_dir / "manifest.csv"
-    if manifest_path.exists():
+    if not manifest_path.exists():
+        errors.append("Missing manifest.csv. A training bundle without a manifest is not traceable.")
+    else:
         with manifest_path.open("r", newline="", encoding="utf-8") as handle:
             for row in csv.DictReader(handle):
+                manifest_rows += 1
+                label = row.get("image_id") or row.get("image_path") or "<unknown image>"
                 group = row.get("source_id") or row.get("source_group") or row.get("doi") or row.get("image_id") or row.get("file_name", "")
                 groups_by_split.setdefault(group, set()).add(row.get("split", ""))
                 layer = row.get("dataset_layer", "") or "unspecified"
                 dataset_layers[layer] = dataset_layers.get(layer, 0) + 1
+
                 if not row.get("nm_per_px") and layer not in {"real_near_emps"}:
-                    warnings.append(f"Missing nm_per_px in manifest for {row.get('image_id') or row.get('image_path')}.")
+                    provenance["missing_calibration"] += 1
+                    warnings.append(f"Missing nm_per_px in manifest for {label}.")
+
+                # Licence and source are surfaced for every row, not only the
+                # public demo layer: an untraceable image cannot be published
+                # later even if it trains fine now.
+                if not row.get("license") and not row.get("license_status"):
+                    provenance["missing_license"] += 1
+                    warnings.append(f"Missing license and license_status for {label}.")
+                if not row.get("source_url") and not row.get("doi"):
+                    provenance["missing_source"] += 1
+                    warnings.append(f"Missing source_url and doi for {label}.")
+                if "file_sha256" in (row or {}) and not row.get("file_sha256"):
+                    provenance["missing_checksum"] += 1
+                    warnings.append(f"Missing file_sha256 for {label}.")
+                if row.get("annotation_review") == "partial":
+                    provenance["partial_annotation_review"] += 1
+
                 if layer == "public_demo" and row.get("license_status") not in {"accepted", "public", "cc_by", "cc0"}:
-                    warnings.append(f"Public demo row lacks accepted license status: {row.get('image_id') or row.get('image_path')}.")
+                    errors.append(f"Public demo row lacks accepted license status: {label}.")
 
     for group, splits in groups_by_split.items():
         if len(splits) > 1:
@@ -133,12 +160,19 @@ def audit_dataset(dataset_dir, min_images=0, min_au_core=0, min_sio2_outer=0, re
     if "SiO2_outer" in class_counts and class_counts["SiO2_outer"] < min_sio2_outer:
         errors.append(f"SiO2_outer labels {class_counts['SiO2_outer']} below minimum {min_sio2_outer}.")
 
+    if manifest_rows and sum(counts.values()) != manifest_rows:
+        warnings.append(
+            f"Manifest lists {manifest_rows} images but {sum(counts.values())} are present on disk."
+        )
+
     return {
         "ok": not errors,
         "counts": counts,
         "label_rows": label_rows,
         "class_counts": class_counts,
         "dataset_layers": dataset_layers,
+        "manifest_rows": manifest_rows,
+        "provenance": provenance,
         "errors": errors,
         "warnings": warnings,
     }

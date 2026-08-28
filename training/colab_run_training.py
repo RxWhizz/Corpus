@@ -1,12 +1,10 @@
 import argparse
 import json
-import os
 import shutil
 import subprocess
 import sys
 import zipfile
 from pathlib import Path
-
 
 CLASS_NAMES = ["Au_core", "SiO2_outer"]
 
@@ -88,7 +86,7 @@ def audit_dataset(dataset_dir):
     errors = []
     warnings = []
     counts = {"train": 0, "val": 0, "test": 0}
-    class_counts = {name: 0 for name in CLASS_NAMES}
+    class_counts = dict.fromkeys(CLASS_NAMES, 0)
     label_rows = 0
 
     data_yaml = dataset_dir / "data.yaml"

@@ -1,7 +1,6 @@
 import argparse
 import json
 import sys
-from pathlib import Path
 
 from common import (
     ANNOTATIONS_DIR,
@@ -19,7 +18,6 @@ from common import (
     read_csv,
 )
 from metadata import validate_metadata
-
 
 CATEGORIES = [
     {"id": 0, "name": "Au_core", "supercategory": "nanoparticle"},

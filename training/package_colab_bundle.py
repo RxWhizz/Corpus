@@ -4,10 +4,9 @@ import zipfile
 from pathlib import Path
 
 from audit_training_dataset import audit_dataset, write_report
-from common_training import DEFAULT_IMPORTED_COCO, DEFAULT_YOLO_DIR, ROOT, TRAINING_AUDIT_MD
+from common_training import DEFAULT_IMPORTED_COCO, DEFAULT_YOLO_DIR, ROOT
 from generate_synthetic_core_shell import generate_dataset
 from prepare_yolo_seg import prepare_yolo
-
 
 DEFAULT_OUT = ROOT / "data" / "training" / "colab_bundle"
 DEFAULT_ZIP_NAME = "corpus_colab_training_bundle.zip"

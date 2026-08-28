@@ -1,0 +1,133 @@
+{
+  "config": [
+    "--shape-preset",
+    "generic",
+    "--mode",
+    "sio2",
+    "--sio2-min-radius",
+    "30",
+    "--sio2-max-radius",
+    "90"
+  ],
+  "decorated_particle_metrics": null,
+  "ground_truth_comparison": {
+    "detected_mean_diameter_nm": 112.75,
+    "detected_objects": 4,
+    "mean_diameter_ratio": 0.971983,
+    "true_mean_diameter_nm": 116.0,
+    "true_particles": 3
+  },
+  "image_id": "demo_002_core_shell_low_contrast",
+  "manual_scale_px": 100.0,
+  "nm_per_px": 1.0,
+  "object_summary": {
+    "mean_inner_major_axis": 0,
+    "mean_outer_major_axis": 112.75,
+    "mean_shell_thickness": 0,
+    "needs_review": 4,
+    "objects": 4,
+    "paired": 0,
+    "ready": 0,
+    "watershed_splits": 0
+  },
+  "objects": [
+    {
+      "backend": "classical",
+      "center_x": 433.5,
+      "center_y": 486.5,
+      "confidence_score": 0.7,
+      "equivalent_diameter": 60.937699,
+      "flags": [
+        "unpaired_inner"
+      ],
+      "inner_major_axis": 0,
+      "inner_minor_axis": 0,
+      "inner_outer_ratio": 0,
+      "object_id": "obj_0001",
+      "outer_major_axis": 115.0,
+      "outer_minor_axis": 29.0,
+      "pair_status": "partial",
+      "preset": "generic",
+      "review_status": "needs_review",
+      "separation_method": "contour/hough",
+      "shell_thickness_estimate": 0
+    },
+    {
+      "backend": "classical",
+      "center_x": 240.0,
+      "center_y": 340.0,
+      "confidence_score": 0.7,
+      "equivalent_diameter": 124.231933,
+      "flags": [
+        "unpaired_inner"
+      ],
+      "inner_major_axis": 0,
+      "inner_minor_axis": 0,
+      "inner_outer_ratio": 0,
+      "object_id": "obj_0002",
+      "outer_major_axis": 124.0,
+      "outer_minor_axis": 124.0,
+      "pair_status": "partial",
+      "preset": "generic",
+      "review_status": "needs_review",
+      "separation_method": "contour/hough",
+      "shell_thickness_estimate": 0
+    },
+    {
+      "backend": "classical",
+      "center_x": 340.0,
+      "center_y": 170.0,
+      "confidence_score": 0.7,
+      "equivalent_diameter": 100.298882,
+      "flags": [
+        "unpaired_inner"
+      ],
+      "inner_major_axis": 0,
+      "inner_minor_axis": 0,
+      "inner_outer_ratio": 0,
+      "object_id": "obj_0003",
+      "outer_major_axis": 100.0,
+      "outer_minor_axis": 100.0,
+      "pair_status": "partial",
+      "preset": "generic",
+      "review_status": "needs_review",
+      "separation_method": "contour/hough",
+      "shell_thickness_estimate": 0
+    },
+    {
+      "backend": "classical",
+      "center_x": 150.0,
+      "center_y": 160.0,
+      "confidence_score": 0.7,
+      "equivalent_diameter": 111.965694,
+      "flags": [
+        "unpaired_inner"
+      ],
+      "inner_major_axis": 0,
+      "inner_minor_axis": 0,
+      "inner_outer_ratio": 0,
+      "object_id": "obj_0004",
+      "outer_major_axis": 112.0,
+      "outer_minor_axis": 112.0,
+      "pair_status": "partial",
+      "preset": "generic",
+      "review_status": "needs_review",
+      "separation_method": "contour/hough",
+      "shell_thickness_estimate": 0
+    }
+  ],
+  "scale_method": "manual_override",
+  "scale_nm": 100.0,
+  "summary": {
+    "SiO2_carrier": {
+      "count": 4,
+      "max_diameter": 124.0,
+      "mean_diameter": 112.75,
+      "min_diameter": 100.0
+    }
+  },
+  "warnings": [
+    "Low contrast",
+    "Many unpaired objects"
+  ]
+}

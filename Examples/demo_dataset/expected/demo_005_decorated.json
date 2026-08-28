@@ -1,0 +1,100 @@
+{
+  "config": [
+    "--shape-preset",
+    "decorated",
+    "--mode",
+    "both",
+    "--au-min-radius",
+    "4",
+    "--au-max-radius",
+    "20",
+    "--sio2-min-radius",
+    "40",
+    "--sio2-max-radius",
+    "110"
+  ],
+  "decorated_particle_metrics": {
+    "carriers": 2,
+    "mean_decoration_density_per_1000_nm2": 0.363975,
+    "mean_decoration_diameter": 18.416667,
+    "mean_decorations_per_carrier": 5.5,
+    "total_decorations_on_carriers": 11
+  },
+  "ground_truth_comparison": {
+    "detected_mean_diameter_nm": 140.0,
+    "detected_objects": 2,
+    "mean_diameter_ratio": 1.0,
+    "true_mean_diameter_nm": 140.0,
+    "true_particles": 2
+  },
+  "image_id": "demo_005_decorated",
+  "manual_scale_px": 100.0,
+  "nm_per_px": 1.0,
+  "object_summary": {
+    "mean_inner_major_axis": 0,
+    "mean_outer_major_axis": 140.0,
+    "mean_shell_thickness": 0,
+    "needs_review": 0,
+    "objects": 2,
+    "paired": 0,
+    "ready": 2,
+    "watershed_splits": 0
+  },
+  "objects": [
+    {
+      "backend": "classical",
+      "center_x": 179.0,
+      "center_y": 181.0,
+      "confidence_score": 0.7,
+      "equivalent_diameter": 156.0,
+      "flags": [],
+      "inner_major_axis": 0,
+      "inner_minor_axis": 0,
+      "inner_outer_ratio": 0,
+      "object_id": "obj_0001",
+      "outer_major_axis": 156.0,
+      "outer_minor_axis": 156.0,
+      "pair_status": "decorated_carrier",
+      "preset": "decorated",
+      "review_status": "ready",
+      "separation_method": "contour/hough",
+      "shell_thickness_estimate": 0
+    },
+    {
+      "backend": "classical",
+      "center_x": 351.0,
+      "center_y": 329.0,
+      "confidence_score": 0.7,
+      "equivalent_diameter": 124.0,
+      "flags": [],
+      "inner_major_axis": 0,
+      "inner_minor_axis": 0,
+      "inner_outer_ratio": 0,
+      "object_id": "obj_0002",
+      "outer_major_axis": 124.0,
+      "outer_minor_axis": 124.0,
+      "pair_status": "decorated_carrier",
+      "preset": "decorated",
+      "review_status": "ready",
+      "separation_method": "contour/hough",
+      "shell_thickness_estimate": 0
+    }
+  ],
+  "scale_method": "manual_override",
+  "scale_nm": 100.0,
+  "summary": {
+    "Au_decorations": {
+      "count": 11,
+      "max_diameter": 22.0,
+      "mean_diameter": 18.636364,
+      "min_diameter": 16.0
+    },
+    "SiO2_carrier": {
+      "count": 2,
+      "max_diameter": 156.0,
+      "mean_diameter": 140.0,
+      "min_diameter": 124.0
+    }
+  },
+  "warnings": []
+}

@@ -4,7 +4,6 @@ import json
 from collections import Counter
 from pathlib import Path
 
-
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_TRIAGE_DIR = ROOT / "data" / "interim" / "figures" / "triaged"
 DEFAULT_REPORT = ROOT / "reports" / "figure_triage_manual_review.md"

@@ -1,0 +1,144 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PYTHON_VERSION: "3.11"
+
+jobs:
+  linux:
+    name: Linux (tests, lint, smoke)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: requirements-dev.txt
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          # Headless OpenCV: the CI runner has no display and no GTK stack.
+          pip install opencv-python-headless
+          pip install -r requirements-dev.txt
+
+      - name: Lint (ruff)
+        run: ruff check .
+
+      - name: Python syntax check
+        run: python -m compileall -q corpus corpus_pipeline training scripts measurement_modes.py preview_image.py python_script.py
+
+      - name: Unit tests
+        run: pytest tests -q
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+
+      - name: Install Node dependencies
+        run: npm ci
+
+      - name: Node syntax check
+        run: |
+          node --check main.js
+          node --check render.js
+          node --check training/run_python.js
+
+      - name: Shell syntax check
+        run: bash -n build-ubuntu.sh corpus-launch.sh
+
+      - name: Demo dataset integrity
+        run: |
+          python scripts/build_demo_dataset.py --check
+          python scripts/build_demo_expected.py --check
+
+      - name: Dataset and validation smoke test
+        run: python -m corpus.dev.smoke --json
+
+  windows:
+    name: Windows (tests, checks)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: requirements-dev.txt
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+
+      - name: Unit tests
+        run: pytest tests -q
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+
+      - name: Install Node dependencies
+        run: npm ci
+
+      - name: Node syntax check
+        run: |
+          node --check main.js
+          node --check render.js
+          node --check training/run_python.js
+
+      - name: Dataset and validation smoke test
+        run: python -m corpus.dev.smoke --json
+
+  build-smoke:
+    name: Electron build smoke (${{ matrix.os }})
+    # Packaging is slow, so it runs on main, on tags, and on demand -- not on
+    # every pull request.
+    if: github.event_name != 'pull_request'
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+
+      - name: Install Node dependencies
+        run: npm ci
+
+      - name: Build unpacked application (Linux)
+        if: runner.os == 'Linux'
+        run: npx electron-builder --linux dir --x64
+
+      - name: Build unpacked application (Windows)
+        if: runner.os == 'Windows'
+        run: npx electron-builder --win dir --x64
+
+      - name: Confirm build output exists
+        shell: bash
+        run: |
+          test -d dist
+          find dist -maxdepth 2 -type d -print

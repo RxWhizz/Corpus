@@ -11,7 +11,6 @@ from pathlib import Path
 import cv2
 import numpy as np
 
-
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_INPUT = ROOT / "data" / "interim" / "figures" / "pdf_extracted"
 DEFAULT_OUTPUT = ROOT / "data" / "interim" / "figures" / "triaged"

@@ -1,10 +1,10 @@
+import math
+import os
+
 import cv2
 import numpy as np
 import pandas as pd
-import os
-import math
-import matplotlib.pyplot as plt
-import sys
+
 rel_files=[]
 tif_files = []
 def get_tif_files(folder_path):

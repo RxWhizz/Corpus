@@ -7,10 +7,10 @@ from common_training import (
     DATA_DIR,
     DEFAULT_IMPORTED_COCO,
     DEFAULT_YOLO_DIR,
-    ROOT,
     annotation_review_status,
     category_mapping,
     copy_image,
+    file_sha256,
     load_json,
     normalize_polygon,
     read_csv,
@@ -51,6 +51,7 @@ def corpus_image_index():
 
 def annotations_by_image(coco, category_map):
     grouped = defaultdict(list)
+    skipped_by_image = defaultdict(int)
     warnings = []
     skipped_review = 0
     for annotation in coco.get("annotations", []):
@@ -65,11 +66,12 @@ def annotations_by_image(coco, category_map):
             continue
         if annotation_review_status(annotation) != "ready":
             skipped_review += 1
+            skipped_by_image[image_id] += 1
             continue
         grouped[image_id].append((category_map[category_id], segmentation))
     if skipped_review:
         warnings.append(f"Skipped {skipped_review} needs_review/ignored annotations.")
-    return grouped, warnings
+    return grouped, skipped_by_image, warnings
 
 
 def prepare_yolo(coco_path, output_dir):
@@ -80,7 +82,7 @@ def prepare_yolo(coco_path, output_dir):
 
     output_dir = Path(output_dir)
     by_name, by_id = corpus_image_index()
-    annotations, warnings = annotations_by_image(coco, category_map)
+    annotations, skipped_by_image, warnings = annotations_by_image(coco, category_map)
 
     image_infos = []
     groups = set()
@@ -102,14 +104,14 @@ def prepare_yolo(coco_path, output_dir):
     exported_images = 0
     exported_labels = 0
     skipped_without_labels = 0
-    class_counts = {name: 0 for name in CLASS_NAMES}
+    class_counts = dict.fromkeys(CLASS_NAMES, 0)
 
     for image, source_path, corpus_row, group, split in image_infos:
         split = split if split in {"train", "val", "test"} else split_for_group(group, ranked_groups)
         width = int(image.get("width") or corpus_row.get("width") or 0)
         height = int(image.get("height") or corpus_row.get("height") or 0)
         label_lines = []
-        image_class_counts = {name: 0 for name in CLASS_NAMES}
+        image_class_counts = dict.fromkeys(CLASS_NAMES, 0)
         for class_id, polygons in annotations.get(image.get("id"), []):
             for polygon in polygons:
                 normalized = normalize_polygon(polygon, width, height)
@@ -133,6 +135,19 @@ def prepare_yolo(coco_path, output_dir):
         label_target.write_text("\n".join(label_lines), encoding="utf-8")
         exported_images += 1
         exported_labels += len(label_lines)
+        skipped_labels = skipped_by_image.get(image.get("id"), 0)
+        nm_per_px = corpus_row.get("nm_per_px") or image.get("nm_per_px") or image.get("metadata", {}).get("nm_per_px", "")
+        license_text = corpus_row.get("license") or image.get("license") or image.get("metadata", {}).get("license", "")
+        license_status = corpus_row.get("license_status") or image.get("license_status") or image.get("metadata", {}).get("license_status", "")
+        source_url = corpus_row.get("source_url") or image.get("metadata", {}).get("source_url", "")
+
+        # Missing provenance is surfaced here rather than discovered at
+        # publication time.
+        if not license_text and not license_status:
+            warnings.append(f"Missing license and license_status for image {image.get('id')} ({source_path.name}).")
+        if not source_url and not (corpus_row.get("doi") or image.get("metadata", {}).get("doi", "")):
+            warnings.append(f"Missing source_url and doi for image {image.get('id')} ({source_path.name}).")
+
         manifest.append(
             {
                 "image_id": image.get("id"),
@@ -141,14 +156,18 @@ def prepare_yolo(coco_path, output_dir):
                 "dataset_layer": corpus_row.get("dataset_layer") or image.get("dataset_layer") or image.get("metadata", {}).get("dataset_layer", ""),
                 "image_path": str(image_target),
                 "label_path": str(label_target),
+                "file_sha256": file_sha256(image_target),
                 "labels": len(label_lines),
                 "au_core_labels": image_class_counts["Au_core"],
                 "sio2_outer_labels": image_class_counts["SiO2_outer"],
-                "nm_per_px": corpus_row.get("nm_per_px") or image.get("nm_per_px") or image.get("metadata", {}).get("nm_per_px", ""),
-                "license": corpus_row.get("license") or image.get("license") or image.get("metadata", {}).get("license", ""),
-                "license_status": corpus_row.get("license_status") or image.get("license_status") or image.get("metadata", {}).get("license_status", ""),
+                "annotation_review": "partial" if skipped_labels else "ready",
+                "skipped_review_labels": skipped_labels,
+                "nm_per_px": nm_per_px,
+                "calibration_state": "confirmed" if nm_per_px else "missing",
+                "license": license_text,
+                "license_status": license_status,
                 "doi": corpus_row.get("doi") or image.get("metadata", {}).get("doi", ""),
-                "source_url": corpus_row.get("source_url") or image.get("metadata", {}).get("source_url", ""),
+                "source_url": source_url,
                 "figure_label": corpus_row.get("figure_label") or image.get("metadata", {}).get("figure_label", ""),
                 "panel_label": corpus_row.get("panel_label") or image.get("metadata", {}).get("panel_label", ""),
                 "caption": corpus_row.get("caption") or image.get("metadata", {}).get("caption", ""),

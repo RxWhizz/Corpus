@@ -1,3 +1,25 @@
+"""Corpus measurement CLI -- the contract used by the Electron main process.
+
+This file is intentionally thin. The scientific logic lives in the ``corpus``
+package so it can be imported and tested without Electron:
+
+    corpus.calibration  nm/pixel from a scale bar
+    corpus.segmentation binarisation, watershed, backend contract
+    corpus.measurement  contour geometry -> calibrated particle records
+    corpus.metrology    core-shell derivations, distribution summaries
+    corpus.review       confidence scoring, review status, overlays
+    corpus.io           image decoding, exports, run provenance
+
+What remains here is argument parsing, the per-preset orchestration
+(``run_spheres`` / ``run_pellets`` / ``run_generic`` / ``run_decorated``), and
+the JSON envelope. Names migrated into the package are re-exported below so
+existing imports of this module keep working.
+
+Usage (also see ``python -m corpus.dev.smoke``):
+
+    python measurement_modes.py --image IMG --scale 100 --shape-preset spheres
+"""
+
 import argparse
 import json
 import math
@@ -7,15 +29,87 @@ from pathlib import Path
 import cv2
 import numpy as np
 
+from corpus import __version__ as CORPUS_VERSION
+from corpus.calibration import collect_scale_candidates, nm_per_pixel
+from corpus.calibration import parse_scale_line as _parse_scale_line
+from corpus.calibration import resolve_scale as _resolve_scale
+from corpus.calibration import scale_bar_confidence as scale_confidence
+from corpus.errors import CalibrationError, CorpusError
+from corpus.io import (
+    DIAMETERS_TXT,
+    MEASUREMENTS_JSON,
+    OUTPUT_IMAGE,
+    read_image,
+    run_fingerprint,
+    write_compat_files,
+    write_measurements_json,
+)
+from corpus.measurement import (
+    clamp_filter_settings,
+    contour_measurements,
+    flat_measurement,
+    hough_circle_measurements,
+    is_duplicate,
+    nearest_measurement,
+    overlap_ratio,
+    parse_bool,
+    resolve_watershed,
+    touches_edge,
+)
+from corpus.metrology import (
+    build_normality_report,
+    normality_stats,
+    object_row,
+    summarize_class_measurements,
+    summarize_decorated,
+    summarize_objects,
+)
+from corpus.review import (
+    INNER_COLOR,
+    OUTER_COLOR,
+    REVIEW_COLOR,
+    build_warnings,
+    draw_detection,
+    draw_review_labels,
+    draw_review_markers,
+)
+from corpus.segmentation import particle_binary, sio2_mask, watershed_split_contours
 
-OUTPUT_IMAGE = "processed_image.jpg"
-DIAMETERS_TXT = "diameters.txt"
-MEASUREMENTS_JSON = "measurements.json"
 AU_CLASS = "Au_decorations"
 SIO2_CLASS = "SiO2_carrier"
-INNER_COLOR = (0, 0, 255)
-OUTER_COLOR = (255, 180, 0)
-REVIEW_COLOR = (0, 220, 255)
+
+#: Names this module has always exported. Several are now re-exports from the
+#: `corpus` package; they stay listed here so code that imported them from
+#: `measurement_modes` keeps working through the migration.
+__all__ = [
+    # preset orchestration, still implemented here
+    "main", "parse_args", "fail",
+    "detect_au_contours", "detect_sio2_watershed", "detect_sio2_generic",
+    "anchored_pellet_outer", "run_spheres", "run_pellets", "run_generic", "run_decorated",
+    # constants
+    "AU_CLASS", "SIO2_CLASS", "SEGMENTATION_BACKEND",
+    "OUTPUT_IMAGE", "DIAMETERS_TXT", "MEASUREMENTS_JSON",
+    "INNER_COLOR", "OUTER_COLOR", "REVIEW_COLOR",
+    # re-exported from corpus.calibration
+    "collect_scale_candidates", "nm_per_pixel", "scale_confidence",
+    "parse_manual_scale_line", "resolve_scale",
+    # re-exported from corpus.segmentation
+    "particle_binary", "sio2_mask", "watershed_split_contours",
+    # re-exported from corpus.measurement
+    "clamp_filter_settings", "contour_measurements", "flat_measurement",
+    "hough_circle_measurements", "is_duplicate", "nearest_measurement",
+    "overlap_ratio", "parse_bool", "resolve_watershed", "touches_edge",
+    # re-exported from corpus.metrology
+    "build_normality_report", "normality_stats", "object_row",
+    "summarize_class_measurements", "summarize_decorated", "summarize_objects",
+    # re-exported from corpus.review
+    "build_warnings", "draw_detection", "draw_review_labels", "draw_review_markers",
+    # re-exported from corpus.io
+    "read_image", "run_fingerprint", "write_compat_files", "write_measurements_json",
+]
+
+#: Backend that produced the masks in this build. See corpus.segmentation.backends.
+SEGMENTATION_BACKEND = "classical"
 
 
 def fail(message):
@@ -23,10 +117,20 @@ def fail(message):
     raise SystemExit(1)
 
 
-def parse_bool(value):
-    if isinstance(value, bool):
-        return value
-    return str(value).strip().lower() not in ("0", "false", "no", "off")
+def parse_manual_scale_line(value):
+    """CLI wrapper: report a bad manual scale line as JSON instead of a traceback."""
+    try:
+        return _parse_scale_line(value)
+    except CalibrationError as error:
+        fail(str(error))
+
+
+def resolve_scale(image, scale_length, manual_scale_px, manual_scale_line=None):
+    """CLI wrapper around :func:`corpus.calibration.resolve_scale`."""
+    try:
+        return _resolve_scale(image, scale_length, manual_scale_px, manual_scale_line)
+    except CalibrationError as error:
+        fail(str(error))
 
 
 def parse_args():
@@ -58,389 +162,6 @@ def parse_args():
     return parser.parse_args()
 
 
-def parse_manual_scale_line(value):
-    if not value:
-        return None
-    try:
-        coords = [float(part.strip()) for part in value.split(",")]
-    except ValueError:
-        fail("--manual-scale-line must be x1,y1,x2,y2")
-    if len(coords) != 4:
-        fail("--manual-scale-line must be x1,y1,x2,y2")
-    x1, y1, x2, y2 = coords
-    length = math.hypot(x2 - x1, y2 - y1)
-    if length <= 0:
-        fail("--manual-scale-line points must not be identical")
-    return {
-        "x1": x1,
-        "y1": y1,
-        "x2": x2,
-        "y2": y2,
-        "length": length
-    }
-
-
-def resolve_watershed(value, shape_preset):
-    if str(value).strip().lower() == "auto":
-        return shape_preset != "pellets"
-    return parse_bool(value)
-
-
-def clamp_filter_settings(args):
-    threshold_min = max(0, min(255, args.manual_threshold_min))
-    threshold_max = max(0, min(255, args.manual_threshold_max))
-    if threshold_min > threshold_max:
-        threshold_min, threshold_max = threshold_max, threshold_min
-    min_circularity = max(0.0, min(1.0, args.min_circularity))
-    max_circularity = max(0.0, min(1.0, args.max_circularity))
-    min_elongation = max(1.0, args.min_elongation)
-    max_elongation = max(1.0, args.max_elongation)
-    if min_circularity > max_circularity:
-        min_circularity, max_circularity = max_circularity, min_circularity
-    if min_elongation > max_elongation:
-        min_elongation, max_elongation = max_elongation, min_elongation
-    return {
-        "ui_mode": args.ui_mode,
-        "contrast_strategy": args.contrast_strategy,
-        "manual_threshold_min": threshold_min,
-        "manual_threshold_max": threshold_max,
-        "min_circularity": min_circularity,
-        "max_circularity": max_circularity,
-        "min_elongation": min_elongation,
-        "max_elongation": max_elongation,
-        "include_holes": parse_bool(args.include_holes),
-        "review_view": args.review_view
-    }
-
-
-def particle_binary(gray, settings, default_threshold=80):
-    strategy = settings.get("contrast_strategy", "dark_particles")
-    if strategy == "manual_gray_range":
-        lo = int(settings.get("manual_threshold_min", 0))
-        hi = int(settings.get("manual_threshold_max", default_threshold))
-        return cv2.inRange(gray, lo, hi)
-    if strategy == "bright_shells":
-        _, binary = cv2.threshold(gray, 185, 255, cv2.THRESH_BINARY)
-        return binary
-    _, binary = cv2.threshold(gray, default_threshold, 255, cv2.THRESH_BINARY_INV)
-    return binary
-
-
-def read_image(image_path):
-    image = cv2.imread(str(image_path))
-    if image is not None:
-        return image
-
-    try:
-        from PIL import Image
-    except ImportError:
-        return None
-
-    try:
-        pil_image = Image.open(image_path).convert("RGB")
-    except Exception:
-        return None
-
-    return cv2.cvtColor(np.array(pil_image), cv2.COLOR_RGB2BGR)
-
-
-def overlap_ratio(first, second):
-    ax, ay, aw, ah = first
-    bx, by, bw, bh = second
-    ix = max(0, min(ax + aw, bx + bw) - max(ax, bx))
-    iy = max(0, min(ay + ah, by + bh) - max(ay, by))
-    return (ix * iy) / max(1, aw * ah)
-
-
-def touches_edge(bbox, image_shape, margin=2):
-    x, y, w, h = bbox
-    height, width = image_shape[:2]
-    return x <= margin or y <= margin or x + w >= width - margin or y + h >= height - margin
-
-
-def collect_scale_candidates(image):
-    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-    height, width = gray.shape
-    min_bar_width = max(20, int(width * 0.08))
-    image_area = height * width
-    candidates = []
-
-    _, binary = cv2.threshold(gray, 245, 255, cv2.THRESH_BINARY)
-    contours, _ = cv2.findContours(binary, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-    for contour in contours:
-        x, y, w, h = cv2.boundingRect(contour)
-        if w * h > image_area * 0.25:
-            continue
-        if y >= height - 10:
-            continue
-        if w >= min_bar_width and 1 <= h <= 35 and w / max(h, 1) > 6:
-            confidence = scale_confidence(x, y, w, h, width, height)
-            candidates.append({
-                "x": x,
-                "y": y,
-                "width_px": float(w),
-                "height_px": float(h),
-                "method": "bright_contour",
-                "confidence": confidence
-            })
-
-    x0 = int(width * 0.35)
-    y0 = int(height * 0.55)
-    roi = gray[y0:height, x0:width]
-    edges = cv2.Canny(roi, 50, 150)
-    lines = cv2.HoughLinesP(
-        edges,
-        1,
-        math.pi / 180,
-        threshold=15,
-        minLineLength=min_bar_width,
-        maxLineGap=4
-    )
-    if lines is not None:
-        for line in lines[:, 0, :]:
-            x1, y1, x2, y2 = [int(value) for value in line]
-            dx = x2 - x1
-            dy = y2 - y1
-            length = math.sqrt(dx * dx + dy * dy)
-            absolute_y = y0 + min(y1, y2)
-            absolute_x = x0 + min(x1, x2)
-            if abs(dy) <= 3 and length >= min_bar_width and absolute_y < height - 10:
-                confidence = scale_confidence(absolute_x, absolute_y, length, max(1, abs(dy) + 1), width, height)
-                candidates.append({
-                    "x": int(absolute_x),
-                    "y": int(absolute_y),
-                    "width_px": float(length),
-                    "height_px": float(max(1, abs(dy) + 1)),
-                    "method": "hough_line",
-                    "confidence": confidence
-                })
-
-    candidates.sort(key=lambda item: item["confidence"], reverse=True)
-    deduped = []
-    for candidate in candidates:
-        bbox = (candidate["x"], candidate["y"], int(candidate["width_px"]), max(1, int(candidate["height_px"])))
-        if any(overlap_ratio(bbox, (row["x"], row["y"], int(row["width_px"]), max(1, int(row["height_px"])))) > 0.5 for row in deduped):
-            continue
-        deduped.append(candidate)
-    return deduped
-
-
-def scale_confidence(x, y, w, h, image_width, image_height):
-    length_score = min(1.0, w / max(image_width * 0.18, 1))
-    bottom_score = min(1.0, max(0.0, y / max(image_height * 0.85, 1)))
-    right_score = min(1.0, max(0.0, x / max(image_width * 0.65, 1)))
-    thin_score = min(1.0, (w / max(h, 1)) / 12)
-    edge_penalty = 0.45 if y >= image_height - 10 else 0
-    return round(max(0.0, 0.45 * length_score + 0.25 * bottom_score + 0.2 * right_score + 0.1 * thin_score - edge_penalty), 4)
-
-
-def resolve_scale(image, scale_length, manual_scale_px, manual_scale_line=None):
-    candidates = collect_scale_candidates(image)
-    if manual_scale_line:
-        padding = 8
-        min_x = int(math.floor(min(manual_scale_line["x1"], manual_scale_line["x2"]))) - padding
-        min_y = int(math.floor(min(manual_scale_line["y1"], manual_scale_line["y2"]))) - padding
-        max_x = int(math.ceil(max(manual_scale_line["x1"], manual_scale_line["x2"]))) + padding
-        max_y = int(math.ceil(max(manual_scale_line["y1"], manual_scale_line["y2"]))) + padding
-        height, width = image.shape[:2]
-        x = max(0, min_x)
-        y = max(0, min_y)
-        w = max(1, min(width, max_x) - x)
-        h = max(1, min(height, max_y) - y)
-        selected = {
-            "x": x,
-            "y": y,
-            "width_px": float(manual_scale_line["length"]),
-            "height_px": float(max(1, h)),
-            "method": "manual_line",
-            "confidence": 1.0,
-            "line": {
-                "x1": float(manual_scale_line["x1"]),
-                "y1": float(manual_scale_line["y1"]),
-                "x2": float(manual_scale_line["x2"]),
-                "y2": float(manual_scale_line["y2"])
-            }
-        }
-        ignored_regions = [(x, y, w, h)]
-    elif manual_scale_px and manual_scale_px > 0:
-        selected = {
-            "x": "",
-            "y": "",
-            "width_px": float(manual_scale_px),
-            "height_px": "",
-            "method": "manual_override",
-            "confidence": 1.0
-        }
-        ignored_regions = []
-    elif candidates:
-        selected = candidates[0]
-        ignored_regions = [(
-            int(selected["x"]),
-            int(selected["y"]),
-            int(round(selected["width_px"])),
-            max(1, int(round(float(selected["height_px"]))))
-        )]
-    else:
-        fail("Could not detect a white scale bar. Enter Manual Scale px or use an image with a visible scale bar.")
-
-    nm_per_px = scale_length / float(selected["width_px"])
-    return nm_per_px, selected, candidates, ignored_regions
-
-
-def watershed_split_contours(binary, min_radius_px, max_radius_px, distance_factor=0.55):
-    foreground = np.uint8(binary > 0) * 255
-    if not np.any(foreground):
-        return []
-
-    kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
-    foreground = cv2.morphologyEx(foreground, cv2.MORPH_CLOSE, kernel, iterations=2)
-    original_contours, _ = cv2.findContours(foreground, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-    if not original_contours:
-        return []
-
-    distance = cv2.distanceTransform(foreground, cv2.DIST_L2, 5)
-    if distance.max() <= 0:
-        return original_contours
-
-    marker_labels = None
-    marker_count = 0
-    for factor in (distance_factor, distance_factor * 0.85, distance_factor * 0.70):
-        threshold = max(2.0, float(distance.max()) * max(0.20, factor))
-        sure_foreground = np.uint8(distance >= threshold) * 255
-        marker_count, marker_labels = cv2.connectedComponents(sure_foreground)
-        if marker_count >= 2:
-            break
-
-    if marker_labels is None or marker_count <= 1:
-        return original_contours
-
-    sure_background = cv2.dilate(foreground, kernel, iterations=2)
-    unknown = cv2.subtract(sure_background, np.uint8(marker_labels > 0) * 255)
-    markers = marker_labels + 1
-    markers[unknown == 255] = 0
-
-    watershed_image = cv2.cvtColor(foreground, cv2.COLOR_GRAY2BGR)
-    cv2.watershed(watershed_image, markers)
-
-    split_contours = []
-    for marker_id in range(2, marker_count + 1):
-        region = np.uint8(markers == marker_id) * 255
-        region = cv2.morphologyEx(region, cv2.MORPH_OPEN, kernel, iterations=1)
-        contours, _ = cv2.findContours(region, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-        if contours:
-            split_contours.append(max(contours, key=cv2.contourArea))
-
-    return split_contours or original_contours
-
-
-def contour_measurements(contours, class_name, min_radius_px, max_radius_px, nm_per_px, color, overlay, ignored_regions, exclude_edges, measurement_flags=None, separation_method="contour", filter_settings=None):
-    measurements = []
-    min_area = math.pi * min_radius_px**2
-    max_area = math.pi * max_radius_px**2 * 3.0
-    measurement_flags = measurement_flags or []
-    filter_settings = filter_settings or {}
-    min_circularity = filter_settings.get("min_circularity", 0)
-    max_circularity = filter_settings.get("max_circularity", 1)
-    min_elongation = filter_settings.get("min_elongation", 1)
-    max_elongation = filter_settings.get("max_elongation", 999)
-
-    for contour in contours:
-        area = cv2.contourArea(contour)
-        perimeter = cv2.arcLength(contour, True)
-        if area <= 0 or perimeter <= 0:
-            continue
-
-        bbox = cv2.boundingRect(contour)
-        edge = touches_edge(bbox, overlay.shape)
-        if exclude_edges and edge:
-            continue
-        if any(overlap_ratio(bbox, region) > 0.2 for region in ignored_regions):
-            continue
-
-        rect = cv2.minAreaRect(contour)
-        (x, y), (width, height), angle = rect
-        major_px = max(width, height)
-        minor_px = min(width, height)
-        if major_px <= 0 or minor_px <= 0:
-            continue
-
-        circularity = 4 * math.pi * area / (perimeter * perimeter)
-        aspect_ratio = major_px / minor_px
-        radius_px = major_px / 2
-        if not (min_circularity <= circularity <= max_circularity):
-            continue
-        if not (min_elongation <= aspect_ratio <= max_elongation):
-            continue
-        is_round = circularity >= 0.55 and aspect_ratio < 1.8
-        is_elongated = circularity >= 0.25 and aspect_ratio >= 1.8
-        if not (is_round or is_elongated):
-            continue
-        if not (min_radius_px <= radius_px <= max_radius_px):
-            continue
-        if not (min_area * 0.65 <= area <= max_area):
-            continue
-
-        flags = list(measurement_flags)
-        if "watershed_split" in flags and (area < min_area * 0.55 or circularity < 0.35):
-            flags.append("low_split_confidence")
-        if edge:
-            flags.append("edge")
-
-        shape = "elongated" if is_elongated else "round"
-        draw_detection(overlay, contour, rect, shape, color)
-        measurement = flat_measurement(
-            class_name=class_name,
-            center_x=x,
-            center_y=y,
-            major_px=major_px,
-            minor_px=minor_px,
-            area_px=area,
-            angle=angle,
-            shape=shape,
-            confidence=circularity,
-            nm_per_px=nm_per_px,
-            flags=flags,
-            separation_method=separation_method
-        )
-        measurements.append(measurement)
-
-    return measurements
-
-
-def draw_detection(overlay, contour, rect, shape, color):
-    if shape == "elongated":
-        box = cv2.boxPoints(rect)
-        box = np.intp(box)
-        cv2.drawContours(overlay, [box], -1, color, 2)
-    else:
-        (x, y), radius = cv2.minEnclosingCircle(contour)
-        cv2.circle(overlay, (int(x), int(y)), int(radius), color, 2)
-    cv2.drawContours(overlay, [contour], -1, color, 1)
-
-
-def flat_measurement(class_name, center_x, center_y, major_px, minor_px, area_px, angle, shape, confidence, nm_per_px, flags=None, separation_method="contour"):
-    flags = flags or []
-    major_axis = float(major_px * nm_per_px)
-    minor_axis = float(minor_px * nm_per_px)
-    return {
-        "class": class_name,
-        "diameter": major_axis,
-        "major_axis": major_axis,
-        "minor_axis": minor_axis,
-        "equivalent_diameter": float(math.sqrt(4 * area_px / math.pi) * nm_per_px) if area_px > 0 else 0,
-        "radius_px": float(major_px / 2),
-        "center_x": float(center_x),
-        "center_y": float(center_y),
-        "area_px": float(area_px),
-        "aspect_ratio": round(float(major_px / max(minor_px, 1e-6)), 4),
-        "shape": shape,
-        "angle": float(angle),
-        "separation_method": separation_method,
-        "confidence_hint": round(float(confidence), 4),
-        "flags": flags
-    }
-
-
 def detect_au_contours(image, min_radius_px, max_radius_px, nm_per_px, overlay, ignored_regions, exclude_edges, watershed_enabled=False, watershed_factor=0.55, filter_settings=None):
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
     filter_settings = filter_settings or {}
@@ -469,145 +190,6 @@ def detect_au_contours(image, min_radius_px, max_radius_px, nm_per_px, overlay, 
                 filter_settings
             )
     return contour_measurements(legacy_contours, AU_CLASS, min_radius_px, max_radius_px, nm_per_px, INNER_COLOR, overlay, ignored_regions, exclude_edges, filter_settings=filter_settings)
-
-
-def hough_circle_measurements(gray, class_name, min_radius_px, max_radius_px, nm_per_px, color, overlay, ignored_regions, exclude_edges):
-    blur = cv2.medianBlur(gray, 5)
-    circles = cv2.HoughCircles(
-        blur,
-        cv2.HOUGH_GRADIENT,
-        dp=1.2,
-        minDist=max(12, int(min_radius_px * 1.7)),
-        param1=90,
-        param2=28,
-        minRadius=max(1, int(round(min_radius_px))),
-        maxRadius=max(2, int(round(max_radius_px)))
-    )
-    measurements = []
-    if circles is None:
-        return measurements
-
-    image_area = gray.shape[0] * gray.shape[1]
-    max_circle_area = image_area * 0.25
-
-    for circle in np.round(circles[0]).astype(int):
-        x, y, radius = [int(value) for value in circle]
-        if math.pi * radius * radius > max_circle_area:
-            continue
-        bbox = (x - radius, y - radius, radius * 2, radius * 2)
-        edge = touches_edge(bbox, overlay.shape)
-        if exclude_edges and edge:
-            continue
-        if any(overlap_ratio(bbox, region) > 0.2 for region in ignored_regions):
-            continue
-        measurement = flat_measurement(
-            class_name=class_name,
-            center_x=x,
-            center_y=y,
-            major_px=2 * radius,
-            minor_px=2 * radius,
-            area_px=math.pi * radius * radius,
-            angle=0,
-            shape="round",
-            confidence=0.75,
-            nm_per_px=nm_per_px,
-            flags=["edge"] if edge else [],
-            separation_method="hough"
-        )
-        if is_duplicate(measurement, measurements):
-            continue
-        cv2.circle(overlay, (x, y), radius, color, 2)
-        measurements.append(measurement)
-    return measurements
-
-
-def is_duplicate(measurement, measurements, factor=0.65):
-    for existing in measurements:
-        dx = measurement["center_x"] - existing["center_x"]
-        dy = measurement["center_y"] - existing["center_y"]
-        distance = math.sqrt(dx * dx + dy * dy)
-        radius = max(measurement["radius_px"], existing["radius_px"], 1)
-        if distance < radius * factor:
-            return True
-    return False
-
-
-def nearest_measurement(center, candidates, max_distance):
-    best = None
-    best_distance = None
-    for candidate in candidates:
-        dx = center[0] - candidate["center_x"]
-        dy = center[1] - candidate["center_y"]
-        distance = math.sqrt(dx * dx + dy * dy)
-        if distance <= max_distance and (best_distance is None or distance < best_distance):
-            best = candidate
-            best_distance = distance
-    return best, best_distance
-
-
-def object_row(index, preset, inner=None, outer=None, extra_flags=None):
-    flags = list(extra_flags or [])
-    for measurement in (inner, outer):
-        if measurement:
-            flags.extend(measurement.get("flags", []))
-    if not inner:
-        flags.append("unpaired_inner")
-    if not outer:
-        flags.append("unpaired_outer")
-
-    inner_major = inner.get("major_axis", 0) if inner else 0
-    outer_major = outer.get("major_axis", 0) if outer else 0
-    inner_minor = inner.get("minor_axis", 0) if inner else 0
-    outer_minor = outer.get("minor_axis", 0) if outer else 0
-    shell = (outer_major - inner_major) / 2 if inner and outer and outer_major >= inner_major else 0
-    ratio = inner_major / outer_major if inner and outer and outer_major else 0
-    center_x = (outer or inner or {}).get("center_x", 0)
-    center_y = (outer or inner or {}).get("center_y", 0)
-
-    if inner and outer and (ratio < 0.25 or ratio > 0.85):
-        flags.append("ratio_outlier")
-    confidence = 1.0
-    if "unpaired_inner" in flags or "unpaired_outer" in flags:
-        confidence -= 0.3
-    if "edge" in flags:
-        confidence -= 0.2
-    if "ratio_outlier" in flags:
-        confidence -= 0.2
-    if "low_split_confidence" in flags:
-        confidence -= 0.2
-    confidence = max(0.0, round(confidence, 3))
-    if confidence < 0.7 and "low_confidence" not in flags:
-        flags.append("low_confidence")
-    review_flags = set(flags) - {"watershed_split"}
-
-    return {
-        "object_id": f"obj_{index:04d}",
-        "preset": preset,
-        "class": "core_shell_object",
-        "center_x": center_x,
-        "center_y": center_y,
-        "inner_major_axis": inner_major,
-        "inner_minor_axis": inner_minor,
-        "outer_major_axis": outer_major,
-        "outer_minor_axis": outer_minor,
-        "equivalent_diameter": outer.get("equivalent_diameter", 0) if outer else inner.get("equivalent_diameter", 0) if inner else 0,
-        "shell_thickness_estimate": shell,
-        "inner_outer_ratio": ratio,
-        "pair_status": "paired" if inner and outer else "partial",
-        "review_status": "ready" if confidence >= 0.7 and not review_flags else "needs_review",
-        "confidence_score": confidence,
-        "separation_method": "watershed" if "watershed_split" in flags else "contour/hough",
-        "flags": sorted(set(flags)),
-        "inner": inner,
-        "outer": outer
-    }
-
-
-def sio2_mask(image, include_holes=False):
-    gray = cv2.GaussianBlur(cv2.cvtColor(image, cv2.COLOR_BGR2GRAY), (7, 7), 0)
-    adaptive = cv2.adaptiveThreshold(gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY_INV, 35, 3)
-    kernel_size = 3 if include_holes else 9
-    return cv2.morphologyEx(adaptive, cv2.MORPH_CLOSE, np.ones((kernel_size, kernel_size), np.uint8), iterations=2)
 
 
 def detect_sio2_watershed(image, min_radius_px, max_radius_px, nm_per_px, overlay, ignored_regions, exclude_edges, watershed_factor=0.55, filter_settings=None):
@@ -839,7 +421,7 @@ def run_decorated(image, mode, au_min_px, au_max_px, sio2_min_px, sio2_max_px, n
         projected_area = math.pi * max(carrier.get("major_axis", 0) / 2, 1e-6) * max(carrier.get("minor_axis", 0) / 2, 1e-6)
         row["decoration_density_per_1000_nm2"] = (len(inside) / projected_area) * 1000 if projected_area > 0 else 0
         row["mean_decoration_diameter"] = sum(item["diameter"] for item in inside) / len(inside) if inside else 0
-        row["flags"] = sorted(set(flag for flag in row["flags"] if flag != "unpaired_inner"))
+        row["flags"] = sorted({flag for flag in row["flags"] if flag != "unpaired_inner"})
         if inside:
             row["review_status"] = "ready" if row["confidence_score"] >= 0.7 else "needs_review"
         else:
@@ -855,131 +437,6 @@ def run_decorated(image, mode, au_min_px, au_max_px, sio2_min_px, sio2_max_px, n
                 index += 1
 
     return objects, decorations + carriers
-
-
-def summarize_decorated(objects):
-    carriers = [row for row in objects if row.get("preset") == "decorated" and row.get("outer_major_axis")]
-    if not carriers:
-        return None
-    counts = [row.get("decoration_count", 0) for row in carriers]
-    densities = [row.get("decoration_density_per_1000_nm2", 0) for row in carriers]
-    mean_decoration_diameters = [row.get("mean_decoration_diameter", 0) for row in carriers if row.get("mean_decoration_diameter", 0) > 0]
-    return {
-        "carriers": len(carriers),
-        "total_decorations_on_carriers": sum(counts),
-        "mean_decorations_per_carrier": sum(counts) / len(counts),
-        "mean_decoration_density_per_1000_nm2": sum(densities) / len(densities) if densities else 0,
-        "mean_decoration_diameter": sum(mean_decoration_diameters) / len(mean_decoration_diameters) if mean_decoration_diameters else 0
-    }
-
-
-def summarize_class_measurements(class_measurements):
-    summary = {}
-    for class_name in sorted({row["class"] for row in class_measurements}):
-        values = [row["diameter"] for row in class_measurements if row["class"] == class_name]
-        summary[class_name] = {
-            "count": len(values),
-            "mean_diameter": sum(values) / len(values) if values else 0,
-            "min_diameter": min(values) if values else 0,
-            "max_diameter": max(values) if values else 0
-        }
-    return summary
-
-
-def summarize_objects(objects):
-    paired = [row for row in objects if row["pair_status"] == "paired"]
-    ready = [row for row in objects if row["review_status"] == "ready"]
-    watershed_splits = [row for row in objects if "watershed_split" in row.get("flags", [])]
-    inner_values = [row["inner_major_axis"] for row in objects if row.get("inner_major_axis")]
-    outer_values = [row["outer_major_axis"] for row in objects if row.get("outer_major_axis")]
-    shell_values = [row["shell_thickness_estimate"] for row in objects if row.get("shell_thickness_estimate")]
-    return {
-        "objects": len(objects),
-        "paired": len(paired),
-        "ready": len(ready),
-        "needs_review": len(objects) - len(ready),
-        "watershed_splits": len(watershed_splits),
-        "mean_inner_major_axis": sum(inner_values) / len(inner_values) if inner_values else 0,
-        "mean_outer_major_axis": sum(outer_values) / len(outer_values) if outer_values else 0,
-        "mean_shell_thickness": sum(shell_values) / len(shell_values) if shell_values else 0
-    }
-
-
-def normality_stats(values):
-    values = [float(value) for value in values if value and value > 0]
-    n = len(values)
-    if n == 0:
-        return {"n": 0, "normality_hint": "no data"}
-    mean = sum(values) / n
-    variance = sum((value - mean) ** 2 for value in values) / n
-    std = math.sqrt(variance)
-    if n < 8 or std <= 1e-9:
-        return {
-            "n": n,
-            "mean": mean,
-            "std": std,
-            "normality_hint": "insufficient_n"
-        }
-    skewness = sum(((value - mean) / std) ** 3 for value in values) / n
-    kurtosis_excess = sum(((value - mean) / std) ** 4 for value in values) / n - 3
-    hint = "roughly_normal" if abs(skewness) < 1 and abs(kurtosis_excess) < 2 else "check_distribution"
-    return {
-        "n": n,
-        "mean": mean,
-        "std": std,
-        "skewness": skewness,
-        "kurtosis_excess": kurtosis_excess,
-        "normality_hint": hint
-    }
-
-
-def build_normality_report(objects, class_measurements):
-    report = {}
-    for class_name in sorted({row["class"] for row in class_measurements}):
-        report[f"{class_name}_diameter"] = normality_stats(
-            [row["diameter"] for row in class_measurements if row["class"] == class_name]
-        )
-    report["inner_major_axis"] = normality_stats([row.get("inner_major_axis") for row in objects])
-    report["outer_major_axis"] = normality_stats([row.get("outer_major_axis") for row in objects])
-    report["shell_thickness"] = normality_stats([row.get("shell_thickness_estimate") for row in objects])
-    return report
-
-
-def build_warnings(image, objects, selected_scale):
-    warnings = []
-    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-    if float(np.std(gray)) < 18:
-        warnings.append("Low contrast")
-    if selected_scale.get("method") not in ("manual_line", "manual_override"):
-        warnings.append("Scale was auto-detected; manual scale is recommended")
-    if objects:
-        edge_count = sum(1 for row in objects if "edge" in row.get("flags", []))
-        unpaired_count = sum(1 for row in objects if row.get("pair_status") == "partial")
-        if edge_count / len(objects) > 0.25:
-            warnings.append("Too many edge objects")
-        if unpaired_count / len(objects) > 0.35:
-            warnings.append("Many unpaired objects")
-    return warnings
-
-
-def draw_review_labels(overlay, objects):
-    for row in objects:
-        x = int(row.get("center_x", 0))
-        y = int(row.get("center_y", 0))
-        label = str(row.get("object_id", "")).replace("obj_", "")
-        if not label:
-            continue
-        cv2.putText(overlay, label, (x + 5, y - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.42, (20, 20, 20), 2, cv2.LINE_AA)
-        cv2.putText(overlay, label, (x + 5, y - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.42, (255, 255, 255), 1, cv2.LINE_AA)
-
-
-def write_compat_files(nm_per_px, class_measurements, preferred_class):
-    preferred = [row for row in class_measurements if row["class"] == preferred_class]
-    rows = preferred or class_measurements
-    with open(DIAMETERS_TXT, "w", encoding="utf-8") as file:
-        file.write(f"{nm_per_px}\n")
-        for row in rows:
-            file.write(f"{row['diameter']}\n")
 
 
 def main():
@@ -1018,16 +475,31 @@ def main():
     else:
         objects, class_measurements = run_generic(image, args.mode, au_min_px, au_max_px, sio2_min_px, sio2_max_px, nm_per_px, overlay, ignored_regions, exclude_edges, watershed_enabled, args.watershed_min_distance_factor, filter_settings)
 
-    for row in objects:
-        if row["review_status"] != "ready":
-            x = int(row.get("center_x", 0))
-            y = int(row.get("center_y", 0))
-            cv2.circle(overlay, (x, y), 4, REVIEW_COLOR, -1)
+    draw_review_markers(overlay, objects)
 
     if filter_settings["review_view"] == "numbered":
         draw_review_labels(overlay, objects)
 
     cv2.imwrite(OUTPUT_IMAGE, overlay)
+    fingerprint = run_fingerprint(
+        image_path,
+        {
+            "mode": args.mode,
+            "shape_preset": args.shape_preset,
+            "scale_nm": args.scale,
+            "manual_scale_px": args.manual_scale_px,
+            "manual_scale_line": args.manual_scale_line,
+            "exclude_edges": exclude_edges,
+            "watershed": watershed_enabled,
+            "watershed_min_distance_factor": args.watershed_min_distance_factor,
+            "au_min_radius": args.au_min_radius,
+            "au_max_radius": args.au_max_radius,
+            "sio2_min_radius": args.sio2_min_radius,
+            "sio2_max_radius": args.sio2_max_radius,
+            **filter_settings,
+        },
+        CORPUS_VERSION,
+    )
     payload = {
         "ok": True,
         "mode": args.mode,
@@ -1044,6 +516,9 @@ def main():
             "review_view": args.review_view
         },
         "filter_settings": filter_settings,
+        "corpus_version": CORPUS_VERSION,
+        "segmentation_backend": SEGMENTATION_BACKEND,
+        "run_fingerprint": fingerprint,
         "processed_image_path": os.path.abspath(OUTPUT_IMAGE),
         "measurements_path": os.path.abspath(MEASUREMENTS_JSON),
         "nm_per_px": nm_per_px,
@@ -1063,11 +538,13 @@ def main():
 
     preferred_class = AU_CLASS if args.mode != "sio2" else SIO2_CLASS
     write_compat_files(nm_per_px, class_measurements, preferred_class)
-    with open(MEASUREMENTS_JSON, "w", encoding="utf-8") as file:
-        json.dump(payload, file, indent=2)
+    write_measurements_json(payload)
 
     print(json.dumps(payload))
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except CorpusError as error:
+        fail(str(error))

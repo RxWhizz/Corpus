@@ -4,7 +4,6 @@ import json
 import shutil
 from pathlib import Path
 
-
 ROOT = Path(__file__).resolve().parents[1]
 DATA_DIR = ROOT / "data"
 ANNOTATIONS_DIR = DATA_DIR / "annotations"
@@ -155,6 +154,16 @@ def stable_hash(value):
     return hashlib.sha1(str(value).encode("utf-8", errors="ignore")).hexdigest()
 
 
+def file_sha256(path, chunk_size=1 << 20):
+    """SHA-256 of a file, streamed. Recorded in the dataset manifest so an
+    exported image can be traced back to the exact bytes it came from."""
+    digest = hashlib.sha256()
+    with Path(path).open("rb") as handle:
+        for chunk in iter(lambda: handle.read(chunk_size), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
 def normalize_polygon(points, width, height):
     if len(points) < 6 or len(points) % 2:
         return None
@@ -175,26 +184,37 @@ def read_csv(path):
         return list(csv.DictReader(handle))
 
 
+#: Manifest columns. Provenance columns (`file_sha256`, `license`,
+#: `license_status`, `doi`, `source_url`) and annotation state
+#: (`annotation_review`, `skipped_review_labels`) are part of the contract:
+#: a training bundle without them cannot be traced back to its sources.
+MANIFEST_FIELDS = [
+    "image_id",
+    "source_id",
+    "split",
+    "dataset_layer",
+    "image_path",
+    "label_path",
+    "file_sha256",
+    "labels",
+    "au_core_labels",
+    "sio2_outer_labels",
+    "annotation_review",
+    "skipped_review_labels",
+    "nm_per_px",
+    "calibration_state",
+    "license",
+    "license_status",
+    "doi",
+    "source_url",
+    "figure_label",
+    "panel_label",
+    "caption",
+]
+
+
 def write_manifest(path, rows):
-    fields = [
-        "image_id",
-        "source_id",
-        "split",
-        "dataset_layer",
-        "image_path",
-        "label_path",
-        "labels",
-        "au_core_labels",
-        "sio2_outer_labels",
-        "nm_per_px",
-        "license",
-        "license_status",
-        "doi",
-        "source_url",
-        "figure_label",
-        "panel_label",
-        "caption",
-    ]
+    fields = MANIFEST_FIELDS
     Path(path).parent.mkdir(parents=True, exist_ok=True)
     with Path(path).open("w", newline="", encoding="utf-8") as handle:
         writer = csv.DictWriter(handle, fieldnames=fields)

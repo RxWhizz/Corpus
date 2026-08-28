@@ -1,8 +1,8 @@
 {
   "name": "corpus",
   "version": "1.0.0",
-  "description": "Corpus builder and particle measurement GUI for TEM nanoparticle datasets",
-  "homepage": "https://github.com/RxWhizz/Corpus-New",
+  "description": "TEM nanoparticle metrology, dataset curation and instance-segmentation toolkit built with Electron, OpenCV and Python.",
+  "homepage": "https://github.com/RxWhizz/Corpus#readme",
   "main": "main.js",
   "build": {
     "productName": "Corpus",
@@ -19,11 +19,18 @@
     ],
     "linux": {
       "category": "Science",
-      "maintainer": "Corpus Maintainers <corpus@localhost>",
+      "maintainer": "RxWhizz <corpus-maintainer@users.noreply.github.com>",
       "target": [
-        "AppImage",
+        {
+          "target": "AppImage",
+          "arch": [
+            "x64"
+          ]
+        },
         "dir"
-      ]
+      ],
+      "description": "TEM nanoparticle metrology, dataset curation and instance-segmentation toolkit built with Electron, OpenCV and Python.",
+      "synopsis": "TEM nanoparticle metrology and dataset curation"
     },
     "mac": {
       "target": [
@@ -33,17 +40,42 @@
     },
     "win": {
       "target": [
-        "nsis",
-        "zip"
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "x64"
+          ]
+        }
       ]
+    },
+    "artifactName": "${productName}-${version}-${os}-${arch}.${ext}",
+    "nsis": {
+      "artifactName": "${productName}-${version}-Setup.${ext}",
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
     }
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/RxWhizz/Corpus-New.git"
+    "url": "git+https://github.com/RxWhizz/Corpus.git"
   },
   "scripts": {
     "start": "electron .",
+    "test": "node training/run_python.js -m pytest tests -q",
+    "lint": "node training/run_python.js -m ruff check .",
+    "smoke": "node training/run_python.js -m corpus.dev.smoke",
+    "check:node": "node --check main.js && node --check render.js && node --check training/run_python.js",
+    "demo:build": "node training/run_python.js scripts/build_demo_dataset.py",
+    "demo:check": "node training/run_python.js scripts/build_demo_dataset.py --check",
+    "demo:expected": "node training/run_python.js scripts/build_demo_expected.py",
+    "demo:expected:check": "node training/run_python.js scripts/build_demo_expected.py --check",
+    "validate": "node training/run_python.js -m corpus.validation",
     "dist": "electron-builder",
     "dist:linux": "electron-builder --linux dir --x64",
     "dist:linux:deb": "electron-builder --linux deb --x64",
@@ -71,5 +103,26 @@
     "name": "Tesla_SHT",
     "email": "corpus@localhost"
   },
-  "license": "MIT"
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/RxWhizz/Corpus/issues"
+  },
+  "keywords": [
+    "electron-microscopy",
+    "tem",
+    "nanoparticles",
+    "computer-vision",
+    "image-analysis",
+    "materials-science",
+    "opencv",
+    "instance-segmentation",
+    "scientific-software",
+    "yolo"
+  ],
+  "maintainers": [
+    {
+      "name": "RxWhizz",
+      "url": "https://github.com/RxWhizz"
+    }
+  ]
 }

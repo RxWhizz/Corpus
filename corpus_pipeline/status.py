@@ -8,13 +8,12 @@ from common import (
     IMAGES_CSV,
     REVIEW_FIELDS,
     REVIEW_QUEUE_CSV,
+    ROOT,
     SOURCE_FIELDS,
     SOURCES_CSV,
     print_json,
     read_csv,
-    ROOT,
 )
-
 
 TRIAGE_MANIFEST = ROOT / "data" / "interim" / "figures" / "triaged" / "figure_triage_manifest.csv"
 

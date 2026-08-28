@@ -4,7 +4,6 @@ from pathlib import Path
 
 from common_training import ROOT
 
-
 SEED_PATH = ROOT / "training" / "seed_sources.json"
 DEFAULT_OUT = ROOT / "data" / "training" / "asset_queries"
 

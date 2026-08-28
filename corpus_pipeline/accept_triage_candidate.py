@@ -1,6 +1,5 @@
 import argparse
 import shutil
-from pathlib import Path
 
 from common import (
     FIGURES_DIR,

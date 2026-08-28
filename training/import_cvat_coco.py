@@ -4,8 +4,8 @@ from pathlib import Path
 from common_training import (
     CLASS_NAMES,
     DEFAULT_IMPORTED_COCO,
-    category_mapping,
     canonical_categories,
+    category_mapping,
     load_json,
     write_json,
 )

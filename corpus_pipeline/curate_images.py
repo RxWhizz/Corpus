@@ -11,7 +11,6 @@ from common import (
     write_csv,
 )
 
-
 VALID_STATUSES = {"accepted", "rejected", "needs_review"}
 
 

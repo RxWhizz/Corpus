@@ -7,7 +7,6 @@ from pathlib import Path
 import cv2
 import numpy as np
 
-
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_SUMMARY = ROOT / "data" / "interim" / "figures" / "triaged" / "manual_review_summary.csv"
 DEFAULT_OUT = ROOT / "data" / "interim" / "figures" / "triaged" / "tem_separated"

@@ -1,0 +1,424 @@
+{
+  "demo_001_core_shell_spheres": {
+    "morphology": "core_shell_sphere",
+    "nm_per_px": 1.0,
+    "particles": [
+      {
+        "center": [
+          120,
+          130
+        ],
+        "core_diameter_nm": 44.0,
+        "core_diameter_px": 44,
+        "kind": "core_shell",
+        "outer_diameter_nm": 108.0,
+        "outer_diameter_px": 108,
+        "particle_id": "p01",
+        "shell_thickness_nm": 32.0,
+        "shell_thickness_px": 32
+      },
+      {
+        "center": [
+          300,
+          140
+        ],
+        "core_diameter_nm": 36.0,
+        "core_diameter_px": 36,
+        "kind": "core_shell",
+        "outer_diameter_nm": 92.0,
+        "outer_diameter_px": 92,
+        "particle_id": "p02",
+        "shell_thickness_nm": 28.0,
+        "shell_thickness_px": 28
+      },
+      {
+        "center": [
+          170,
+          320
+        ],
+        "core_diameter_nm": 52.0,
+        "core_diameter_px": 52,
+        "kind": "core_shell",
+        "outer_diameter_nm": 124.0,
+        "outer_diameter_px": 124,
+        "particle_id": "p03",
+        "shell_thickness_nm": 36.0,
+        "shell_thickness_px": 36
+      },
+      {
+        "center": [
+          360,
+          330
+        ],
+        "core_diameter_nm": 40.0,
+        "core_diameter_px": 40,
+        "kind": "core_shell",
+        "outer_diameter_nm": 100.0,
+        "outer_diameter_px": 100,
+        "particle_id": "p04",
+        "shell_thickness_nm": 30.0,
+        "shell_thickness_px": 30
+      }
+    ],
+    "scale_nm": 100.0,
+    "scale_px": 100.0
+  },
+  "demo_002_core_shell_low_contrast": {
+    "morphology": "core_shell_sphere",
+    "nm_per_px": 1.0,
+    "particles": [
+      {
+        "center": [
+          150,
+          160
+        ],
+        "core_diameter_nm": 48.0,
+        "core_diameter_px": 48,
+        "kind": "core_shell",
+        "outer_diameter_nm": 116.0,
+        "outer_diameter_px": 116,
+        "particle_id": "p01",
+        "shell_thickness_nm": 34.0,
+        "shell_thickness_px": 34
+      },
+      {
+        "center": [
+          340,
+          170
+        ],
+        "core_diameter_nm": 42.0,
+        "core_diameter_px": 42,
+        "kind": "core_shell",
+        "outer_diameter_nm": 104.0,
+        "outer_diameter_px": 104,
+        "particle_id": "p02",
+        "shell_thickness_nm": 31.0,
+        "shell_thickness_px": 31
+      },
+      {
+        "center": [
+          240,
+          340
+        ],
+        "core_diameter_nm": 54.0,
+        "core_diameter_px": 54,
+        "kind": "core_shell",
+        "outer_diameter_nm": 128.0,
+        "outer_diameter_px": 128,
+        "particle_id": "p03",
+        "shell_thickness_nm": 37.0,
+        "shell_thickness_px": 37
+      }
+    ],
+    "scale_nm": 100.0,
+    "scale_px": 100.0
+  },
+  "demo_003_touching_spheres": {
+    "morphology": "touching_spheres",
+    "nm_per_px": 0.5,
+    "particles": [
+      {
+        "center": [
+          170,
+          200
+        ],
+        "core_diameter_nm": 46.0,
+        "core_diameter_px": 92,
+        "kind": "disc",
+        "outer_diameter_nm": 46.0,
+        "outer_diameter_px": 92,
+        "particle_id": "p01",
+        "shell_thickness_nm": 0.0,
+        "shell_thickness_px": 0
+      },
+      {
+        "center": [
+          250,
+          200
+        ],
+        "core_diameter_nm": 46.0,
+        "core_diameter_px": 92,
+        "kind": "disc",
+        "outer_diameter_nm": 46.0,
+        "outer_diameter_px": 92,
+        "particle_id": "p02",
+        "shell_thickness_nm": 0.0,
+        "shell_thickness_px": 0
+      },
+      {
+        "center": [
+          340,
+          330
+        ],
+        "core_diameter_nm": 38.0,
+        "core_diameter_px": 76,
+        "kind": "disc",
+        "outer_diameter_nm": 38.0,
+        "outer_diameter_px": 76,
+        "particle_id": "p03",
+        "shell_thickness_nm": 0.0,
+        "shell_thickness_px": 0
+      }
+    ],
+    "scale_nm": 50.0,
+    "scale_px": 100.0
+  },
+  "demo_004_rods": {
+    "morphology": "rod",
+    "nm_per_px": 2.0,
+    "particles": [
+      {
+        "angle_deg": 20,
+        "center": [
+          150,
+          150
+        ],
+        "core_diameter_nm": 288.0,
+        "core_diameter_px": 144,
+        "kind": "rod",
+        "major_axis_px": 144,
+        "minor_axis_px": 48,
+        "outer_diameter_nm": 288.0,
+        "outer_diameter_px": 144,
+        "particle_id": "p01",
+        "shell_thickness_nm": 0.0,
+        "shell_thickness_px": 0
+      },
+      {
+        "angle_deg": 115,
+        "center": [
+          340,
+          180
+        ],
+        "core_diameter_nm": 264.0,
+        "core_diameter_px": 132,
+        "kind": "rod",
+        "major_axis_px": 132,
+        "minor_axis_px": 44,
+        "outer_diameter_nm": 264.0,
+        "outer_diameter_px": 132,
+        "particle_id": "p02",
+        "shell_thickness_nm": 0.0,
+        "shell_thickness_px": 0
+      },
+      {
+        "angle_deg": 70,
+        "center": [
+          200,
+          340
+        ],
+        "core_diameter_nm": 312.0,
+        "core_diameter_px": 156,
+        "kind": "rod",
+        "major_axis_px": 156,
+        "minor_axis_px": 52,
+        "outer_diameter_nm": 312.0,
+        "outer_diameter_px": 156,
+        "particle_id": "p03",
+        "shell_thickness_nm": 0.0,
+        "shell_thickness_px": 0
+      }
+    ],
+    "scale_nm": 200.0,
+    "scale_px": 100.0
+  },
+  "demo_005_decorated": {
+    "morphology": "decorated",
+    "nm_per_px": 1.0,
+    "particles": [
+      {
+        "center": [
+          180,
+          180
+        ],
+        "core_diameter_nm": 0.0,
+        "core_diameter_px": 0,
+        "decoration_count": 6,
+        "decoration_diameter_px": 22,
+        "decorations": [
+          {
+            "center": [
+              228,
+              180
+            ],
+            "diameter_px": 22
+          },
+          {
+            "center": [
+              204,
+              222
+            ],
+            "diameter_px": 22
+          },
+          {
+            "center": [
+              156,
+              222
+            ],
+            "diameter_px": 22
+          },
+          {
+            "center": [
+              132,
+              180
+            ],
+            "diameter_px": 22
+          },
+          {
+            "center": [
+              156,
+              138
+            ],
+            "diameter_px": 22
+          },
+          {
+            "center": [
+              204,
+              138
+            ],
+            "diameter_px": 22
+          }
+        ],
+        "kind": "decorated",
+        "outer_diameter_nm": 156.0,
+        "outer_diameter_px": 156,
+        "particle_id": "p01",
+        "shell_thickness_nm": 0.0,
+        "shell_thickness_px": 0
+      },
+      {
+        "center": [
+          350,
+          330
+        ],
+        "core_diameter_nm": 0.0,
+        "core_diameter_px": 0,
+        "decoration_count": 5,
+        "decoration_diameter_px": 18,
+        "decorations": [
+          {
+            "center": [
+              388,
+              330
+            ],
+            "diameter_px": 18
+          },
+          {
+            "center": [
+              362,
+              367
+            ],
+            "diameter_px": 18
+          },
+          {
+            "center": [
+              319,
+              353
+            ],
+            "diameter_px": 18
+          },
+          {
+            "center": [
+              319,
+              307
+            ],
+            "diameter_px": 18
+          },
+          {
+            "center": [
+              362,
+              293
+            ],
+            "diameter_px": 18
+          }
+        ],
+        "kind": "decorated",
+        "outer_diameter_nm": 124.0,
+        "outer_diameter_px": 124,
+        "particle_id": "p02",
+        "shell_thickness_nm": 0.0,
+        "shell_thickness_px": 0
+      }
+    ],
+    "scale_nm": 100.0,
+    "scale_px": 100.0
+  },
+  "demo_006_mixed_sizes": {
+    "morphology": "core_shell_sphere",
+    "nm_per_px": 1.5,
+    "particles": [
+      {
+        "center": [
+          110,
+          120
+        ],
+        "core_diameter_nm": 42.0,
+        "core_diameter_px": 28,
+        "kind": "core_shell",
+        "outer_diameter_nm": 96.0,
+        "outer_diameter_px": 64,
+        "particle_id": "p01",
+        "shell_thickness_nm": 27.0,
+        "shell_thickness_px": 18
+      },
+      {
+        "center": [
+          240,
+          130
+        ],
+        "core_diameter_nm": 90.0,
+        "core_diameter_px": 60,
+        "kind": "core_shell",
+        "outer_diameter_nm": 222.0,
+        "outer_diameter_px": 148,
+        "particle_id": "p02",
+        "shell_thickness_nm": 66.0,
+        "shell_thickness_px": 44
+      },
+      {
+        "center": [
+          390,
+          150
+        ],
+        "core_diameter_nm": 51.0,
+        "core_diameter_px": 34,
+        "kind": "core_shell",
+        "outer_diameter_nm": 120.0,
+        "outer_diameter_px": 80,
+        "particle_id": "p03",
+        "shell_thickness_nm": 34.5,
+        "shell_thickness_px": 23
+      },
+      {
+        "center": [
+          150,
+          330
+        ],
+        "core_diameter_nm": 102.0,
+        "core_diameter_px": 68,
+        "kind": "core_shell",
+        "outer_diameter_nm": 246.0,
+        "outer_diameter_px": 164,
+        "particle_id": "p04",
+        "shell_thickness_nm": 72.0,
+        "shell_thickness_px": 48
+      },
+      {
+        "center": [
+          350,
+          350
+        ],
+        "core_diameter_nm": 36.0,
+        "core_diameter_px": 24,
+        "kind": "core_shell",
+        "outer_diameter_nm": 84.0,
+        "outer_diameter_px": 56,
+        "particle_id": "p05",
+        "shell_thickness_nm": 24.0,
+        "shell_thickness_px": 16
+      }
+    ],
+    "scale_nm": 150.0,
+    "scale_px": 100.0
+  }
+}

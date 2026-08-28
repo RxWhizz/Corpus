@@ -1,0 +1,131 @@
+name: Release
+
+# Builds the v1.0 release artifacts and attaches them to a GitHub Release.
+# Triggered by pushing a tag such as `v1.0.0`, or manually for a dry run.
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Build artifacts without publishing a release"
+        type: boolean
+        default: true
+
+permissions:
+  contents: write
+
+jobs:
+  verify:
+    name: Verify tag matches package.json
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: version
+        shell: bash
+        run: |
+          PACKAGE_VERSION=$(node -p "require('./package.json').version")
+          echo "version=$PACKAGE_VERSION" >> "$GITHUB_OUTPUT"
+          if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
+            TAG_VERSION="${GITHUB_REF_NAME#v}"
+            if [ "$TAG_VERSION" != "$PACKAGE_VERSION" ]; then
+              echo "Tag $GITHUB_REF_NAME does not match package.json version $PACKAGE_VERSION" >&2
+              exit 1
+            fi
+          fi
+          echo "Releasing version $PACKAGE_VERSION"
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Run the test suite before releasing
+        run: |
+          python -m pip install --upgrade pip
+          pip install opencv-python-headless
+          pip install -r requirements-dev.txt
+          pytest tests -q
+          python -m corpus.dev.smoke --json
+
+  build:
+    name: Build ${{ matrix.os }}
+    needs: verify
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: --linux AppImage --x64
+            artifact: linux
+          - os: windows-latest
+            target: --win nsis zip --x64
+            artifact: windows
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+      - run: npm ci
+      - name: Build installers
+        run: npx electron-builder ${{ matrix.target }} --publish never
+
+      - name: Compute checksums
+        shell: bash
+        run: |
+          cd dist
+          find . -maxdepth 1 -type f \( -name '*.AppImage' -o -name '*.exe' -o -name '*.zip' \) \
+            -exec sha256sum {} + > SHA256SUMS-${{ matrix.artifact }}.txt || true
+          cat SHA256SUMS-${{ matrix.artifact }}.txt || true
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: corpus-${{ matrix.artifact }}
+          path: |
+            dist/*.AppImage
+            dist/*.exe
+            dist/*.zip
+            dist/SHA256SUMS-*.txt
+          if-no-files-found: error
+
+  publish:
+    name: Publish GitHub Release
+    needs: [verify, build]
+    if: github.ref_type == 'tag'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Assemble release notes
+        shell: bash
+        run: |
+          VERSION="${{ needs.verify.outputs.version }}"
+          {
+            echo "## Corpus $VERSION"
+            echo
+            sed -n "/^## \[$VERSION\]/,/^## \[/p" CHANGELOG.md | sed '$d' || true
+            echo
+            echo "### Verifying downloads"
+            echo
+            echo '```'
+            cat artifacts/SHA256SUMS-*.txt 2>/dev/null || echo "(no checksums produced)"
+            echo '```'
+          } > release-notes.md
+          cat release-notes.md
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          body_path: release-notes.md
+          files: |
+            artifacts/*.AppImage
+            artifacts/*.exe
+            artifacts/*.zip
+            artifacts/SHA256SUMS-*.txt
+          fail_on_unmatched_files: false

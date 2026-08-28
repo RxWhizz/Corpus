@@ -1,0 +1,146 @@
+{
+  "images": {
+    "demo_001_core_shell_spheres": {
+      "config": [
+        "--shape-preset",
+        "spheres",
+        "--mode",
+        "both",
+        "--au-min-radius",
+        "5",
+        "--au-max-radius",
+        "40",
+        "--sio2-min-radius",
+        "30",
+        "--sio2-max-radius",
+        "90"
+      ],
+      "ground_truth_comparison": {
+        "detected_mean_diameter_nm": 105.0,
+        "detected_objects": 4,
+        "mean_diameter_ratio": 0.990566,
+        "true_mean_diameter_nm": 106.0,
+        "true_particles": 4
+      },
+      "nm_per_px": 1.0,
+      "objects": 4
+    },
+    "demo_002_core_shell_low_contrast": {
+      "config": [
+        "--shape-preset",
+        "generic",
+        "--mode",
+        "sio2",
+        "--sio2-min-radius",
+        "30",
+        "--sio2-max-radius",
+        "90"
+      ],
+      "ground_truth_comparison": {
+        "detected_mean_diameter_nm": 112.75,
+        "detected_objects": 4,
+        "mean_diameter_ratio": 0.971983,
+        "true_mean_diameter_nm": 116.0,
+        "true_particles": 3
+      },
+      "nm_per_px": 1.0,
+      "objects": 4
+    },
+    "demo_003_touching_spheres": {
+      "config": [
+        "--shape-preset",
+        "generic",
+        "--mode",
+        "au",
+        "--watershed",
+        "true",
+        "--au-min-radius",
+        "10",
+        "--au-max-radius",
+        "40"
+      ],
+      "ground_truth_comparison": {
+        "detected_mean_diameter_nm": 40.333333,
+        "detected_objects": 3,
+        "mean_diameter_ratio": 0.930769,
+        "true_mean_diameter_nm": 43.333333,
+        "true_particles": 3
+      },
+      "nm_per_px": 0.5,
+      "objects": 3
+    },
+    "demo_004_rods": {
+      "config": [
+        "--shape-preset",
+        "generic",
+        "--mode",
+        "sio2",
+        "--watershed",
+        "false",
+        "--sio2-min-radius",
+        "90",
+        "--sio2-max-radius",
+        "200"
+      ],
+      "ground_truth_comparison": {
+        "detected_mean_diameter_nm": 290.210256,
+        "detected_objects": 3,
+        "mean_diameter_ratio": 1.007675,
+        "true_mean_diameter_nm": 288.0,
+        "true_particles": 3
+      },
+      "nm_per_px": 2.0,
+      "objects": 3
+    },
+    "demo_005_decorated": {
+      "config": [
+        "--shape-preset",
+        "decorated",
+        "--mode",
+        "both",
+        "--au-min-radius",
+        "4",
+        "--au-max-radius",
+        "20",
+        "--sio2-min-radius",
+        "40",
+        "--sio2-max-radius",
+        "110"
+      ],
+      "ground_truth_comparison": {
+        "detected_mean_diameter_nm": 140.0,
+        "detected_objects": 2,
+        "mean_diameter_ratio": 1.0,
+        "true_mean_diameter_nm": 140.0,
+        "true_particles": 2
+      },
+      "nm_per_px": 1.0,
+      "objects": 2
+    },
+    "demo_006_mixed_sizes": {
+      "config": [
+        "--shape-preset",
+        "spheres",
+        "--mode",
+        "both",
+        "--au-min-radius",
+        "8",
+        "--au-max-radius",
+        "60",
+        "--sio2-min-radius",
+        "30",
+        "--sio2-max-radius",
+        "140"
+      ],
+      "ground_truth_comparison": {
+        "detected_mean_diameter_nm": 152.4,
+        "detected_objects": 5,
+        "mean_diameter_ratio": 0.992188,
+        "true_mean_diameter_nm": 153.6,
+        "true_particles": 5
+      },
+      "nm_per_px": 1.5,
+      "objects": 5
+    }
+  }
+}

@@ -2,7 +2,7 @@ import argparse
 import json
 import re
 from pathlib import Path
-from urllib.parse import urljoin, urlparse
+from urllib.parse import urlparse
 
 from common import (
     FIGURES_DIR,
@@ -32,7 +32,6 @@ from common import (
     write_csv,
     zenodo_record_id,
 )
-
 
 IMAGE_SUFFIXES = (".png", ".jpg", ".jpeg", ".tif", ".tiff", ".webp")
 HTML_SUFFIXES = ("", ".html", ".htm")

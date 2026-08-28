@@ -3,8 +3,8 @@
   "mode": "both",
   "shape_preset": "spheres",
   "exclude_edges": true,
-  "processed_image_path": "C:\\Users\\LUIS\\Documents\\Particle size\\Corpus\\processed_image.jpg",
-  "measurements_path": "C:\\Users\\LUIS\\Documents\\Particle size\\Corpus\\measurements.json",
+  "processed_image_path": "processed_image.jpg",
+  "measurements_path": "measurements.json",
   "nm_per_px": 0.9613607115671603,
   "scale_bar_px": 52.009614495783374,
   "selected_scale": {
