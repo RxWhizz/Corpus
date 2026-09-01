@@ -5,7 +5,6 @@ from pathlib import Path
 
 from common_training import CLASS_NAMES, DEFAULT_YOLO_DIR, TRAINING_AUDIT_MD
 
-
 #: Dataset milestones from training/README.md, expressed as checks rather than
 #: prose. `min_images` gates the milestone; `min_sources` and `min_real_exact`
 #: capture the "3-5 sources" and "real Au@SiO2 truth" requirements that image
@@ -104,7 +103,7 @@ def write_report(path, result):
     lines.extend([
         "",
         "## Errors",
-    ]
+    ])
     lines.extend(f"- {item}" for item in result["errors"]) if result["errors"] else lines.append("- None")
     lines.extend(["", "## Warnings"])
     lines.extend(f"- {item}" for item in result["warnings"]) if result["warnings"] else lines.append("- None")

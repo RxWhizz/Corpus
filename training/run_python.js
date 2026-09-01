@@ -15,9 +15,22 @@ function bundledPythonCandidates() {
     .map((candidatePath) => ({ command: candidatePath, args: [] }));
 }
 
+function localVirtualEnvCandidates() {
+  const repoRoot = path.resolve(__dirname, '..');
+  const paths = [
+    path.join(repoRoot, '.venv', 'Scripts', 'python.exe'),
+    path.join(repoRoot, '.venv', 'bin', 'python3'),
+    path.join(repoRoot, '.venv', 'bin', 'python'),
+  ];
+  return paths
+    .filter((candidatePath) => fs.existsSync(candidatePath))
+    .map((candidatePath) => ({ command: candidatePath, args: [] }));
+}
+
 function candidates() {
   return [
     process.env.PYTHON ? { command: process.env.PYTHON, args: [] } : null,
+    ...localVirtualEnvCandidates(),
     ...bundledPythonCandidates(),
     { command: 'python', args: [] },
     { command: 'python3', args: [] },
