@@ -1,0 +1,113 @@
+schema_version: 1
+updated: 2026-08-28
+datasets:
+  - id: emps
+    name: Electron Microscopy Particle Segmentation
+    source_url: https://github.com/by256/emps
+    doi: ""
+    publisher: GitHub / EMPS authors
+    domain: electron_microscopy
+    material_scope: generic_nanoparticles
+    modality: EM
+    image_count: 465
+    annotation_type: pixel_level_instance_segmentation
+    ontology: [particle]
+    license: "CC BY 4.0 data / MIT repository; verify exact reuse terms before redistribution"
+    license_status: needs_review
+    redistribution: needs_review
+    citation: needs_review
+    checksum: ""
+    corpus_layer: real_near_emps
+    intended_use: generic_particle_boundary_pretraining
+    download_status: manual_until_license_verified
+    enabled: false
+    adapter: emps
+    download_urls: []
+  - id: psdi_gold_tem_2026
+    name: PSDI Synthetic and Experimental Gold Nanoparticle TEM Segmentation Dataset
+    source_url: https://data-collections.psdi.ac.uk/records/sgvf0-j3g53
+    doi: ""
+    publisher: PSDI
+    domain: electron_microscopy
+    material_scope: gold_nanoparticle_tem
+    modality: TEM
+    image_count: 1674
+    annotation_type: coco_instance_segmentation
+    ontology: [particle]
+    license: CC BY 4.0
+    license_status: verified
+    redistribution: public_demo_allowed_with_attribution
+    citation: Stewart, Andrew; Da Silva De Sa, Natalia. Testing, Training and Validation Synthetic Dataset of Transmission Electron Microscopy (TEM) Images of Gold Nano-particles for Segmentation. PSDI record sgvf0-j3g53, 2026.
+    checksum: images.zip md5:3c81f816417ae979b042b11b04742653; train json md5:43eb21f2e44bbcc7116e5fb83edf72bc; test json md5:0f2fedc6cd541e5715d5600f145fa41f; val json md5:50b2ab3d9a51a5eb6df155917c26271f
+    corpus_layer: experimental_gold_validation
+    intended_use: gold_tem_particle_pretraining_and_domain_adaptation_not_core_shell_truth
+    download_status: local_downloaded_verified
+    enabled: false
+    adapter: psdi_gold
+    download_urls: [https://data-collections.psdi.ac.uk/api/records/sgvf0-j3g53/files/images.zip/content, https://data-collections.psdi.ac.uk/api/records/sgvf0-j3g53/files/instances_annotations_train.json/content, https://data-collections.psdi.ac.uk/api/records/sgvf0-j3g53/files/instances_annotations_test.json/content, https://data-collections.psdi.ac.uk/api/records/sgvf0-j3g53/files/instances_annotations_val.json/content, https://data-collections.psdi.ac.uk/api/records/sgvf0-j3g53/files/val_binary_masks.zip/content, https://data-collections.psdi.ac.uk/api/records/sgvf0-j3g53/files/croissant_metadata.json/content, https://data-collections.psdi.ac.uk/api/records/sgvf0-j3g53/files/ro-crate-metadata.json/content, https://data-collections.psdi.ac.uk/api/records/sgvf0-j3g53/files/README.md/content]
+  - id: agglomerated_non_spherical_em
+    name: Agglomerated / Non-Spherical EM Particle Dataset
+    source_url: https://zenodo.org/records/4563942
+    doi: 10.5281/zenodo.4563942
+    publisher: Zenodo / BAM research data
+    domain: electron_microscopy
+    material_scope: tio2_agglomerated_non_spherical_particles
+    modality: SEM_TSEM
+    image_count: 80
+    annotation_type: segmentation_masks
+    ontology: [particle]
+    license: CC BY-NC-ND 4.0
+    license_status: verified_restricted
+    redistribution: private_training_only_no_redistribution
+    citation: B. Ruehle, J. F. Krumrey, V.-D. Hodoroaba, Workflow towards Automated Segmentation of Agglomerated, Non-Spherical Particles from Electron Microscopy Images using Artificial Neural Networks, DOI 10.1038/s41598-021-84287-6.
+    checksum: sha256:e6541ad11bee51fde6cecfcd1e213098fbdf07b78e165f473f8554091a06b9c7
+    corpus_layer: real_near
+    intended_use: robustness_augmentation_after_license_gate
+    download_status: local_archive_reviewed_restricted
+    enabled: false
+    adapter: bam_tio2
+    download_urls: []
+  - id: corpus_exact_au_sio2
+    name: Corpus Exact Au@SiO2 Core-Shell Annotations
+    source_url: local://data/annotations/cvat_coco_imported.json
+    doi: ""
+    publisher: Corpus local curation
+    domain: electron_microscopy
+    material_scope: au_sio2_core_shell_tem
+    modality: TEM
+    image_count: 0
+    annotation_type: coco_instance_segmentation
+    ontology: [Au_core, SiO2_outer]
+    license: per_image_manifest
+    license_status: needs_review
+    redistribution: mixed_public_demo_and_private_training
+    citation: per_image_manifest
+    checksum: per_image_manifest
+    corpus_layer: real_exact
+    intended_use: final_domain_truth_after_manual_annotation
+    download_status: local_curation_only
+    enabled: false
+    adapter: corpus_native
+    download_urls: []
+  - id: synthetic_core_shell
+    name: Corpus Synthetic Core-Shell Smoke Dataset
+    source_url: local://training/generate_synthetic_core_shell.py
+    doi: ""
+    publisher: Corpus
+    domain: simulated_electron_microscopy
+    material_scope: synthetic_au_sio2_core_shell
+    modality: synthetic_tem_like
+    image_count: 0
+    annotation_type: generated_coco_instance_segmentation
+    ontology: [Au_core, SiO2_outer]
+    license: CC0-1.0
+    license_status: verified
+    redistribution: redistributable_demo_assets
+    citation: Corpus synthetic generator
+    checksum: generator_script_tracked_in_git
+    corpus_layer: synthetic_core_shell
+    intended_use: smoke_tests_curriculum_and_augmentation_not_scientific_claims
+    download_status: generated_not_downloaded
+    enabled: true
+    adapter: corpus_native
+    download_urls: []

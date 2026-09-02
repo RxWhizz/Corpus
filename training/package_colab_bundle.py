@@ -22,6 +22,17 @@ def copy_if_exists(source, target):
     return True
 
 
+def copy_tree_if_exists(source, target):
+    source = Path(source)
+    if not source.exists():
+        return False
+    target = Path(target)
+    if target.exists():
+        shutil.rmtree(target)
+    shutil.copytree(source, target, ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
+    return True
+
+
 def copy_dataset(yolo_dir, target_dir):
     yolo_dir = Path(yolo_dir)
     target_dir = Path(target_dir)
@@ -128,6 +139,20 @@ def package_bundle(args):
     copy_if_exists(ROOT / "training" / "README.md", stage_dir / "training" / "README.md")
     copy_if_exists(ROOT / "training" / "seed_sources.json", stage_dir / "training" / "seed_sources.json")
     copy_if_exists(ROOT / "training" / "colab_run_training.py", stage_dir / "training" / "colab_run_training.py")
+    copy_if_exists(ROOT / "training" / "train_corpus_seg.py", stage_dir / "training" / "train_corpus_seg.py")
+    copy_if_exists(ROOT / "training" / "prepare_particle_yolo_seg.py", stage_dir / "training" / "prepare_particle_yolo_seg.py")
+    copy_if_exists(ROOT / "training" / "dataset_registry.py", stage_dir / "training" / "dataset_registry.py")
+    copy_if_exists(
+        ROOT / "training" / "dataset_discovery_report.py",
+        stage_dir / "training" / "dataset_discovery_report.py",
+    )
+    copy_if_exists(
+        ROOT / "training" / "benchmark_segmentation_backends.py",
+        stage_dir / "training" / "benchmark_segmentation_backends.py",
+    )
+    copy_if_exists(ROOT / "training" / "audit_split_leakage.py", stage_dir / "training" / "audit_split_leakage.py")
+    copy_tree_if_exists(ROOT / "training" / "datasets", stage_dir / "training" / "datasets")
+    copy_tree_if_exists(ROOT / "configs" / "training", stage_dir / "configs" / "training")
     copy_if_exists(ROOT / "training" / "colab_train_yolo_seg.ipynb", stage_dir / "training" / "colab_train_yolo_seg.ipynb")
 
     zip_path = out_dir / args.zip_name

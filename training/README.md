@@ -17,6 +17,32 @@ Training starts after real Au@SiO2 TEM images are curated and annotated. Corpus 
 - `public_demo`: redistributable subset with clear CC BY/CC0/public license.
 - `private_training`: internal-only images that must not be redistributed.
 
+## Registry and Legal Gate
+
+External datasets are listed in `training/datasets/registry.yaml`.
+The downloader refuses any entry unless all of these are true:
+
+- `license_status: verified`
+- `enabled: true`
+- at least one `download_urls` value is present
+- verified downloadable entries record a checksum
+
+Inspect the registry:
+
+```bash
+python training/dataset_registry.py
+python training/dataset_discovery_report.py
+```
+
+Download every currently approved dataset:
+
+```bash
+python training/download_datasets.py --all-approved
+```
+
+Datasets that still say `needs_review` are intentionally blocked until their
+license, citation, source version, and checksum are reviewed.
+
 ## Local PDF Sources
 
 Local paper PDFs can be placed in `Examples/pdfs TEM/`. They are ignored by Git and should be treated as manual-review/private-training material until license and figure reuse rights are confirmed.
@@ -71,9 +97,99 @@ The machine-readable inventory is `training/seed_sources.json`; the human guide 
    ```powershell
    python training\prepare_yolo_seg.py
    python training\audit_training_dataset.py --min-images 5 --min-au-core 5 --min-sio2-outer 5
+   python training\audit_split_leakage.py --manifest data\training\yolo_seg\manifest.csv
    ```
 
-6. Upload `data\training\yolo_seg` to Colab/Drive and run `training\colab_train_yolo_seg.ipynb`.
+6. Run a dry reproducibility gate locally:
+
+   ```powershell
+   python training\train_corpus_seg.py --config configs\training\au_sio2_v1.yaml --dry-run --force
+   ```
+
+7. Upload `data\training\yolo_seg` to Colab/Drive and run `training\colab_train_yolo_seg.ipynb`,
+   or run the same config in a GPU environment:
+
+   ```powershell
+   python training\train_corpus_seg.py --config configs\training\au_sio2_v1.yaml
+   ```
+
+## Normalization and Splits
+
+Approved or curated sources normalize into:
+
+```text
+data/normalized/<dataset_id>/
+├── images/
+├── annotations.json
+├── manifest.csv
+└── provenance.json
+```
+
+Adapters live in `training/adapters/`:
+
+- `bam_tio2.py`: BAM/Zenodo TiO2 SEM images + aligned manual masks as one-class `particle`.
+- `corpus_native.py`: Corpus/CVAT COCO with `Au_core` and `SiO2_outer`.
+- `emps.py`: EMPS image/segmap folders as one-class `particle`.
+- `generic_masks.py`: image + instance-mask datasets as one-class `particle`.
+- `psdi_gold.py`: gold-particle COCO while preserving its non-core-shell ontology.
+
+Build leakage-safe splits from a normalized manifest or COCO file:
+
+```bash
+python training/build_splits.py --manifest data/normalized/corpus_exact_au_sio2/manifest.csv --out data/normalized/corpus_exact_au_sio2/manifest.split.csv
+python training/audit_split_leakage.py --manifest data/normalized/corpus_exact_au_sio2/manifest.split.csv --require-test --exact-test-only
+```
+
+The split auditor also flags duplicate checksums and near-duplicate image
+hashes, especially when they cross train/val/test.
+
+## Particle Pretraining Run
+
+PSDI Gold TEM and BAM TiO2 can be combined because both export the same
+one-class ontology:
+
+- `0: particle`
+
+Build the combined local pretraining dataset:
+
+```bash
+npm run training:combine-particle
+node training/run_python.js training/train_corpus_seg.py --config configs/training/particle_pretrain_psdi_bam.yaml --dry-run --force
+```
+
+The current combined dataset contains 1,714 images and 74,636 particle
+polygons. It is pretraining/domain-adaptation material only; it does not contain
+`Au_core`/`SiO2_outer` masks.
+
+For the local RX570/gfx803 stack, use the revive ROCm container:
+
+```bash
+npm run training:rocm-particle-pretrain
+```
+
+The preliminary `0.4.0` continuation starts from the interrupted ROCm checkpoint
+at `runs/training/particle_pretrain_psdi_bam_rocm_v0_1_03/weights/last.pt` and
+writes a fresh run named `particle_pretrain_psdi_bam_rocm_v0_4_0`:
+
+```bash
+npm run training:rocm-particle-pretrain-0.4.0
+```
+
+This run uses the combined PSDI Gold TEM + BAM TiO2 particle dataset:
+1,714 images and 74,636 one-class `particle` polygons. It is pretraining and
+domain-adaptation material only; final Au@SiO2 core/shell metrology still needs
+Corpus/CVAT `Au_core` and `SiO2_outer` annotations.
+
+The revive stack was intentionally built without DDP. Multi-GPU usage is
+therefore one process per GPU:
+
+```bash
+npm run training:rocm-particle-pretrain-dual
+```
+
+This launches two independent runs, one on each GPU, and is useful for
+parallel hyperparameter exploration. It does not merge both GPUs into one
+faster training job.
 
 ## One-ZIP Colab Bundle
 
@@ -121,6 +237,23 @@ python colab_run_training.py --bundle /content/corpus_colab_training_bundle.zip 
 python colab_run_training.py --dataset /content/corpus_yolo_seg --full --epochs 75 --imgsz 1024 --batch 4
 ```
 
+## Reproducible Experiment Runner
+
+The one-command runner is hardware-neutral. It loads
+`configs/training/au_sio2_v1.yaml`, validates the dataset registry, runs the
+YOLO dataset audit, checks split leakage, records the exact command/config, and
+then trains only if all gates pass.
+
+Outputs are written under `runs/training/<run_id>/`:
+
+- `training_config.yaml`
+- `dataset_manifest.json`
+- `metrics.json`
+- `checksums.txt`
+- `model_card.md`
+- `training_dataset_audit.md`
+- `split_leakage_audit.md`
+
 ## Synthetic Smoke Dataset
 
 Generate a small synthetic COCO dataset:
@@ -149,6 +282,76 @@ npm.cmd run training:package-emps
 
 The prepared dataset is `data\training\emps_yolo_seg`; the Colab ZIP is `data\training\colab_bundle\corpus_colab_training_bundle.zip`. Train this first as a single-class `particle` model, then fine-tune on Corpus Au@SiO2 annotations with `Au_core` and `SiO2_outer`.
 
+## PSDI Gold TEM Dataset
+
+The PSDI record `sgvf0-j3g53` provides a CC BY 4.0 gold-nanoparticle TEM
+segmentation dataset with COCO annotations:
+
+- `train`: 1,501 synthetic TEM images.
+- `test`: 149 synthetic TEM images.
+- `val`: 24 experimental manually annotated TEM images.
+- ontology: one class, `0: particle`.
+
+Place the downloaded source files in `data/external/psdi_gold_tem_2026/`:
+
+```text
+images.zip
+instances_annotations_train.json
+instances_annotations_test.json
+instances_annotations_val.json
+val_binary_masks.zip
+croissant_metadata.json
+ro-crate-metadata.json
+README.md
+```
+
+Normalize and prepare:
+
+```bash
+npm run training:normalize-psdi-gold
+npm run training:prepare-psdi-gold
+npm run training:audit-psdi-gold
+npm run training:audit-psdi-gold-splits
+```
+
+`training:audit-psdi-gold-splits` checks exact checksum/group leakage. The
+stricter perceptual audit can be run with `npm run training:audit-psdi-gold-near`;
+it is expected to flag many train/test near-duplicates because the synthetic
+images share visual generation patterns. Treat PSDI as particle-boundary
+pretraining/domain-adaptation material, not Au@SiO2 core-shell truth.
+
+## BAM TiO2 Pretraining Dataset
+
+The Zenodo/BAM TiO2 dataset in `4563942.zip` contains SEM/TSEM micrographs and
+several segmentation-mask branches. Its source license is `CC BY-NC-ND 4.0`, so
+Corpus treats it as `verified_restricted`: useful for local/private training,
+blocked from automatic download and public-demo redistribution.
+
+The direct, pixel-aligned branch is:
+
+- `Electron Microscopy Images/SEM`
+- `Electron Microscopy Image Masks/TiO2_Masks_Manual_4connected`
+
+The TSEM registration branch and the 2-class/4-class mask branches are left out
+until their frame transforms are handled explicitly.
+
+```bash
+unzip -q 4563942.zip -d /tmp/corpus_bam_tio2
+unzip -q /tmp/corpus_bam_tio2/Datasets.zip -d data/external/agglomerated_non_spherical_em
+npm run training:normalize-bam-tio2
+npm run training:prepare-bam-tio2
+npm run training:audit-bam-tio2
+npm run training:audit-bam-tio2-splits
+```
+
+The output is `data/training/agglomerated_non_spherical_em_yolo_seg` with one
+YOLO-seg class:
+
+- `0: particle`
+
+Use it only as `real_near` particle-boundary pretraining. It is not Au@SiO2
+core-shell truth and must not be used to report core/shell metrology.
+
 ## Metrology Export
 
 After importing CVAT COCO, calculate per-object metrology rows:
@@ -158,6 +361,20 @@ python training\metrology_from_coco.py --coco data\annotations\cvat_coco_importe
 ```
 
 The CSV includes `D_core_nm`, `D_total_nm`, and `t_shell_nm` for paired core-shell instances. Use it for comparison against Fiji/ImageJ manual measurements.
+
+## Backend Benchmark
+
+Benchmark classical, manual-reference, AI-only, or hybrid backends against a
+locked COCO file:
+
+```bash
+python training/benchmark_segmentation_backends.py --coco data/annotations/cvat_coco_imported.json --backend classical --backend manual
+python training/benchmark_segmentation_backends.py --coco data/annotations/cvat_coco_imported.json --backend ai --model runs/training/corpus-seg-au-sio2-v0.1.0/weights/best.pt
+```
+
+The benchmark writes `benchmark.csv`, `benchmark.json`, and `backend_iou.png`
+under `reports/segmentation_benchmark/`. AI and hybrid predictions retain
+`review_required=True`; accepted metrology still comes from the review flow.
 
 ## Dataset Targets
 

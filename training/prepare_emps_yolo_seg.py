@@ -6,6 +6,7 @@ from pathlib import Path
 
 import cv2
 import numpy as np
+from common_training import file_sha256
 
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_EMPS_DIR = ROOT / "data" / "external" / "emps"
@@ -148,10 +149,18 @@ def copy_split(emps_dir, out_dir, split, image_ids, metadata):
                 "file_name": image_path.name,
                 "split": split,
                 "dataset_layer": "real_near_emps",
+                "content_layer": "real_near",
+                "distribution_layer": "private_training",
+                "image_path": str(target_image),
+                "label_path": str(target_label),
+                "file_sha256": file_sha256(target_image),
+                "labels": len(labels),
                 "source_dataset": "EMPS",
+                "source_id": meta.get("doi", "") or image_id,
                 "source_group": meta.get("doi", "") or image_id,
                 "source_url": "https://github.com/by256/emps",
                 "license": "CC BY 4.0 data / MIT repository; verify before redistribution",
+                "license_status": "needs_review",
                 "doi": meta.get("doi", ""),
                 "locator": meta.get("locator", ""),
                 "width": width,
@@ -186,10 +195,18 @@ def write_manifest(out_dir, rows):
         "file_name",
         "split",
         "dataset_layer",
+        "content_layer",
+        "distribution_layer",
+        "image_path",
+        "label_path",
+        "file_sha256",
+        "labels",
         "source_dataset",
+        "source_id",
         "source_group",
         "source_url",
         "license",
+        "license_status",
         "doi",
         "locator",
         "width",

@@ -1,0 +1,20 @@
+run_id: corpus-particle-pretrain-psdi-bam-cpu-v0.1.0
+dataset_dir: data/training/particle_pretrain_psdi_bam_yolo_seg
+registry: training/datasets/registry.yaml
+dataset_ids: [psdi_gold_tem_2026, agglomerated_non_spherical_em]
+allow_restricted: true
+require_test: true
+exact_test_only: false
+near_duplicate_distance: -1
+min_images: 1700
+min_au_core: 0
+min_sio2_outer: 0
+project: runs/training
+name: particle_pretrain_psdi_bam_cpu_v0_1_0
+model_name: yolo11n-seg.pt
+fallback_model: yolo11n-seg.pt
+epochs: 20
+imgsz: 640
+batch: 8
+patience: 6
+device: cpu

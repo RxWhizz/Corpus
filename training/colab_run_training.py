@@ -1,12 +1,11 @@
 import argparse
 import json
+import re
 import shutil
 import subprocess
 import sys
 import zipfile
 from pathlib import Path
-
-CLASS_NAMES = ["Au_core", "SiO2_outer"]
 
 
 def run(command):
@@ -81,15 +80,39 @@ def resolve_dataset(args):
     return dataset_dir
 
 
+def class_names_from_data_yaml(data_yaml):
+    if not data_yaml.exists():
+        return ["Au_core", "SiO2_outer"]
+    names = {}
+    in_names = False
+    for raw_line in data_yaml.read_text(encoding="utf-8").splitlines():
+        line = raw_line.rstrip()
+        if re.match(r"^\s*names\s*:", line):
+            in_names = True
+            continue
+        if in_names:
+            if not line.strip():
+                continue
+            if not raw_line.startswith((" ", "\t")):
+                break
+            match = re.match(r"^\s*(\d+)\s*:\s*(.+?)\s*$", raw_line)
+            if match:
+                names[int(match.group(1))] = match.group(2).strip().strip("'\"")
+    if not names:
+        return ["Au_core", "SiO2_outer"]
+    return [names[index] for index in sorted(names)]
+
+
 def audit_dataset(dataset_dir):
     dataset_dir = Path(dataset_dir)
     errors = []
     warnings = []
     counts = {"train": 0, "val": 0, "test": 0}
-    class_counts = dict.fromkeys(CLASS_NAMES, 0)
+    data_yaml = dataset_dir / "data.yaml"
+    class_names = class_names_from_data_yaml(data_yaml)
+    class_counts = dict.fromkeys(class_names, 0)
     label_rows = 0
 
-    data_yaml = dataset_dir / "data.yaml"
     if not data_yaml.exists():
         errors.append("Missing data.yaml.")
 
@@ -118,10 +141,10 @@ def audit_dataset(dataset_dir):
                 except ValueError:
                     errors.append(f"Non-numeric label values {label}:{line_number}.")
                     continue
-                if class_id < 0 or class_id >= len(CLASS_NAMES):
+                if class_id < 0 or class_id >= len(class_names):
                     errors.append(f"Invalid class id {class_id} in {label}:{line_number}.")
                 else:
-                    class_counts[CLASS_NAMES[class_id]] += 1
+                    class_counts[class_names[class_id]] += 1
                 if any(value < 0 or value > 1 for value in coords):
                     errors.append(f"Coordinates outside [0,1] in {label}:{line_number}.")
                 label_rows += 1
@@ -130,10 +153,6 @@ def audit_dataset(dataset_dir):
         errors.append("No training images.")
     if counts["val"] == 0:
         warnings.append("No validation images. OK for smoke, not for v0.")
-    if class_counts["Au_core"] == 0:
-        errors.append("No Au_core labels.")
-    if class_counts["SiO2_outer"] == 0:
-        errors.append("No SiO2_outer labels.")
 
     result = {
         "ok": not errors,
@@ -176,6 +195,7 @@ def train(dataset_dir, args):
         patience=args.patience,
         project=str(project),
         name=run_name,
+        device=args.device,
     )
     print({"model": loaded_name, "project": str(project), "results": str(results)}, flush=True)
 
@@ -197,6 +217,7 @@ def main():
     parser.add_argument("--batch", type=int, default=4)
     parser.add_argument("--smoke-batch", type=int, default=2)
     parser.add_argument("--patience", type=int, default=20)
+    parser.add_argument("--device", default="", help="Ultralytics device string, e.g. cpu, 0, or 0,1.")
     parser.add_argument("--name", default="corpus_yolo_seg_v0")
     args = parser.parse_args()
 
