@@ -3,7 +3,6 @@ const path = require('path');
 const electron = require('electron');
 const echarts = require('echarts');
 const { ipcRenderer } = electron;
-const { dialog } = require('@electron/remote');
 
 const BROWSER_IMAGE_EXTS = new Set(['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.svg']);
 
@@ -889,14 +888,14 @@ function measurementSeries(payload) {
         }));
 }
 
-function exportChartPng(chartInstance, seriesName) {
+async function exportChartPng(chartInstance, seriesName) {
     const url = chartInstance.getDataURL({ type: 'png', pixelRatio: 2, backgroundColor: '#fff' });
     const base64 = url.replace(/^data:image\/png;base64,/, '');
     const safeName = seriesName.replace(/[^a-z0-9]/gi, '_');
     const defaultPath = currentPayload && currentPayload.measurements_path
         ? currentPayload.measurements_path.replace(/\.json$/, `_${safeName}.png`)
         : `${safeName}.png`;
-    const savePath = dialog.showSaveDialogSync({
+    const savePath = await ipcRenderer.invoke('show-save-dialog', {
         title: 'Exportar gráfica como PNG',
         defaultPath,
         filters: [{ name: 'PNG Image', extensions: ['png'] }]
@@ -1106,7 +1105,7 @@ function saveMeasurementsJson() {
     }
 }
 
-function exportCsv() {
+async function exportCsv() {
     if (!currentPayload || !currentPayload.measurements || !currentPayload.measurements.length) {
         alert('No hay mediciones para exportar.');
         return;
@@ -1115,7 +1114,7 @@ function exportCsv() {
         ? currentPayload.measurements_path.replace(/\.json$/, '.csv')
         : 'measurements.csv';
 
-    const savePath = dialog.showSaveDialogSync({
+    const savePath = await ipcRenderer.invoke('show-save-dialog', {
         title: 'Export measurements as CSV',
         defaultPath,
         filters: [{ name: 'CSV', extensions: ['csv'] }]

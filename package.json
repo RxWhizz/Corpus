@@ -2,6 +2,7 @@
   "name": "corpus",
   "version": "1.0.0",
   "description": "TEM nanoparticle metrology, dataset curation and instance-segmentation toolkit built with Electron, OpenCV and Python.",
+  "packageManager": "npm@11.13.0",
   "homepage": "https://github.com/RxWhizz/Corpus#readme",
   "main": "main.js",
   "build": {
@@ -9,13 +10,44 @@
     "appId": "org.corpus.tem",
     "asar": false,
     "files": [
-      "**/*",
-      "!data/**",
-      "!reports/**",
-      "!runs/**",
-      "!dist/**",
+      "package.json",
+      "main.js",
+      "index.html",
+      "render.js",
+      "measurement_modes.py",
+      "python_script.py",
+      "preview_image.py",
+      "Diameter-Measurement.py",
+      "README.md",
+      "LICENSE",
+      "AUTHORS.md",
+      "CHANGELOG.md",
+      "requirements.txt",
+      "configs/**",
+      "corpus/**",
+      "corpus_pipeline/**",
+      "training/**",
+      "scripts/**",
+      "docs/comparison.md",
+      "docs/dataset_sources.md",
+      "docs/local_pdf_sources.md",
+      "docs/screenshots.md",
+      "docs/images/**",
+      "Examples/demo_dataset/**",
+      "Examples/scanning-electron-microscopy-panel-a.png",
+      "Examples/scanning-electron-microscopy-panel-b.png",
       "!**/__pycache__/**",
-      "!**/*.pyc"
+      "!**/*.pyc",
+      "!**/.pytest_cache/**",
+      "!**/.ruff_cache/**",
+      "!**/.venv/**",
+      "!**/tests/**",
+      "!**/*.pt",
+      "!**/*.zip",
+      "!**/*.tar.gz",
+      "!**/*.AppImage",
+      "!**/*.pdf",
+      "!**/*.log"
     ],
     "linux": {
       "category": "Science",
@@ -75,11 +107,11 @@
     "demo:check": "node training/run_python.js scripts/build_demo_dataset.py --check",
     "demo:expected": "node training/run_python.js scripts/build_demo_expected.py",
     "demo:expected:check": "node training/run_python.js scripts/build_demo_expected.py --check",
-    "validate": "node training/run_python.js -m corpus.validation",
+    "validate": "node training/run_python.js -m corpus.validation --table docs/validation/synthetic_selfcheck/table.csv --out reports/validation_smoke --no-figures",
     "dist": "electron-builder",
     "dist:linux": "electron-builder --linux dir --x64",
     "dist:linux:deb": "electron-builder --linux deb --x64",
-    "package:ubuntu": "npm run dist:linux && tar -czf dist/Corpus-1.0.0-linux-x64.tar.gz -C dist linux-unpacked",
+    "package:ubuntu": "npm run dist:linux && node -e \"const p=require('./package.json'); const {spawnSync}=require('child_process'); const name='dist/Corpus-'+p.version+'-linux-x64.tar.gz'; const r=spawnSync('tar',['-czf',name,'-C','dist','linux-unpacked'],{stdio:'inherit'}); process.exit(r.status||0);\"",
     "package:ubuntu:appimage": "electron-builder --linux AppImage --x64",
     "training:synthetic-bundle": "node training/run_python.js training/package_colab_bundle.py --synthetic-smoke --clean",
     "training:package": "node training/run_python.js training/package_colab_bundle.py --coco data/annotations/cvat_coco_imported.json --clean",
@@ -113,17 +145,15 @@
     "figures:separate-tem": "node training/run_python.js training/separate_review_marked_tem.py --clean"
   },
   "devDependencies": {
-    "electron": "^26.1.0",
-    "electron-builder": "^24.13.3"
+    "electron": "44.2.0",
+    "electron-builder": "26.15.3"
   },
   "dependencies": {
-    "@electron/remote": "^2.0.11",
     "chart.js": "^4.4.0",
-    "echarts": "^5.4.3"
+    "echarts": "6.1.0"
   },
   "author": {
-    "name": "Tesla_SHT",
-    "email": "corpus@localhost"
+    "name": "Tesla_SHT"
   },
   "license": "MIT",
   "bugs": {

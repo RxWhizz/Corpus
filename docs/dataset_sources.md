@@ -1,6 +1,6 @@
 # Dataset Source Priorities for Au@SiO2 Core-Shell
 
-This guide summarizes the source strategy from `C:\Users\LUIS\Downloads\deep-research-report(1).md`.
+This guide summarizes the source strategy from the local deep-research report used during project planning.
 
 ## Primary Target
 

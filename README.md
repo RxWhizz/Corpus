@@ -61,18 +61,22 @@ result reproducible.
 
 ## Installation
 
-### Download a release (recommended)
+### Download a release
 
-Get the Windows installer or the Linux AppImage from
-[Releases](https://github.com/RxWhizz/Corpus/releases). Python 3.10+ with
-`opencv-python`, `numpy` and `pillow` must be available on the machine; the app
-finds it via `PYTHON`, `python`, `python3` or `py -3`.
+When a release is published, get the Windows installer or the Linux AppImage
+from [Releases](https://github.com/RxWhizz/Corpus/releases). Until then, run
+from source using the instructions below. Python 3.10+ with `opencv-python`,
+`numpy` and `pillow` must be available on the machine; the app finds it via
+`PYTHON`, `.venv`, `python`, `python3` or `py -3`.
 
 ```bash
 python -m pip install opencv-python numpy pillow requests pandas matplotlib
 ```
 
 ### Run from source — Linux
+
+Corpus uses npm as its canonical JavaScript package manager; use
+`package-lock.json`/`npm ci` for reproducible installs.
 
 ```bash
 sudo apt update
@@ -82,7 +86,7 @@ sudo apt install -y nodejs npm python3 python3-pip git \
 
 git clone https://github.com/RxWhizz/Corpus.git
 cd Corpus
-npm install
+npm ci
 python3 -m pip install --user -r requirements.txt
 PYTHON=python3 npm run start
 ```
@@ -95,7 +99,7 @@ Install [Node.js LTS](https://nodejs.org/) and
 ```powershell
 git clone https://github.com/RxWhizz/Corpus.git
 cd Corpus
-npm.cmd install
+npm.cmd ci
 python -m pip install -r requirements.txt
 npm.cmd run start
 ```

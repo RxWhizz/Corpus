@@ -1,4 +1,5 @@
-const { app, BrowserWindow, ipcMain } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog } = require('electron');
+const fs = require('fs');
 const path = require('path');
 const { spawn } = require('child_process');
 const corpusScripts = {
@@ -15,8 +16,18 @@ const corpusScripts = {
 };
 
 function pythonCandidates() {
+  const localVenvPaths = [
+    path.join(__dirname, '.venv', 'Scripts', 'python.exe'),
+    path.join(__dirname, '.venv', 'bin', 'python3'),
+    path.join(__dirname, '.venv', 'bin', 'python')
+  ];
+  const localVenvCandidates = localVenvPaths
+    .filter((candidatePath) => fs.existsSync(candidatePath))
+    .map((candidatePath) => ({ command: candidatePath, args: [] }));
+
   return [
     process.env.PYTHON ? { command: process.env.PYTHON, args: [] } : null,
+    ...localVenvCandidates,
     { command: 'python', args: [] },
     { command: 'python3', args: [] },
     { command: 'py', args: ['-3'] }
@@ -107,12 +118,9 @@ function createWindow() {
     height: 1200,
     webPreferences: {
       nodeIntegration: true,
-      contextIsolation: false,
-      enableRemoteModule: true
+      contextIsolation: false
     },
   });
-  require('@electron/remote/main').initialize()  
-  require('@electron/remote/main').enable(win.webContents)  
   win.loadFile('index.html');
   if (process.env.CORPUS_OPEN_DEVTOOLS === '1') {
     win.webContents.openDevTools({ mode: 'bottom' });
@@ -228,4 +236,9 @@ ipcMain.on('corpus-command', async (event, { command, args }) => {
 
 ipcMain.handle('image-to-preview', async (_event, { imagePath }) => {
   return await runPython('preview_image.py', [imagePath]);
+});
+
+ipcMain.handle('show-save-dialog', async (_event, options) => {
+  const result = await dialog.showSaveDialog(options || {});
+  return result.canceled ? null : result.filePath;
 });

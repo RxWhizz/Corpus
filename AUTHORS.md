@@ -14,11 +14,10 @@ The `author` field is preserved as originally recorded and is not reassigned
 when maintainership changes. New work is attributed through commit history and
 the `maintainers` field.
 
-> **Maintainer action required before publishing packages.** The `author.email`
-> in `package.json` is still the placeholder `corpus@localhost`, and the Linux
-> package maintainer address is a GitHub no-reply placeholder. Neither blocks
-> the v1.0 AppImage / NSIS / ZIP targets, but both should be set to real
-> contact addresses before publishing `.deb` or `.rpm` packages or to npm.
+> **Maintainer action required before publishing Linux packages.** The Linux
+> package maintainer address currently uses a GitHub no-reply address. That is
+> acceptable for AppImage and source builds, but a real project contact is
+> recommended before publishing `.deb`, `.rpm` or npm packages.
 
 ## Third-party components
 

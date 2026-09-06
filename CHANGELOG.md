@@ -66,7 +66,7 @@ measurement features.
 
 - **Repository metadata** — `package.json` description, homepage, repository
   URL, bug tracker, keywords and maintainer now point at `RxWhizz/Corpus`. All
-  `Corpus-New` references and hard-coded local development paths are gone.
+  obsolete migration references and hard-coded local development paths are gone.
 - **README** — rewritten around what a new visitor needs in the first minute,
   with the classical and AI subsystems clearly separated and limitations stated
   plainly.

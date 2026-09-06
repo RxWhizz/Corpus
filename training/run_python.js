@@ -1,19 +1,6 @@
 const { spawnSync } = require('child_process');
 const fs = require('fs');
-const os = require('os');
 const path = require('path');
-
-function bundledPythonCandidates() {
-  const home = os.homedir();
-  const paths = [
-    path.join(home, '.cache', 'codex-runtimes', 'codex-primary-runtime', 'dependencies', 'python', 'python.exe'),
-    path.join(home, '.cache', 'codex-runtimes', 'codex-primary-runtime', 'dependencies', 'python', 'bin', 'python3'),
-    path.join(home, '.cache', 'codex-runtimes', 'codex-primary-runtime', 'dependencies', 'python', 'bin', 'python'),
-  ];
-  return paths
-    .filter((candidatePath) => fs.existsSync(candidatePath))
-    .map((candidatePath) => ({ command: candidatePath, args: [] }));
-}
 
 function localVirtualEnvCandidates() {
   const repoRoot = path.resolve(__dirname, '..');
@@ -31,7 +18,6 @@ function candidates() {
   return [
     process.env.PYTHON ? { command: process.env.PYTHON, args: [] } : null,
     ...localVirtualEnvCandidates(),
-    ...bundledPythonCandidates(),
     { command: 'python', args: [] },
     { command: 'python3', args: [] },
     { command: 'py', args: ['-3'] },

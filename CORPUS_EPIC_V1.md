@@ -58,7 +58,7 @@ The following are explicitly outside this Epic unless required to complete v1.0:
 ### Tasks
 
 - Replace all references to:
-  - `Corpus-New`
+  - obsolete migration repo names
   - old clone URLs
   - obsolete local development paths
 - Update `package.json`:
@@ -93,7 +93,7 @@ The following are explicitly outside this Epic unless required to complete v1.0:
 
 ### Acceptance Criteria
 
-- [ ] `grep -R "Corpus-New" .` produces no unintended references.
+- [ ] Search for obsolete migration repo names and local paths produces no unintended references.
 - [ ] README clone instructions work from a fresh machine.
 - [ ] GitHub metadata describes the actual project.
 - [ ] Attribution is preserved and understandable.
